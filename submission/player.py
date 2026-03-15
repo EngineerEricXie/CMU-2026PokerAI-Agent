@@ -54,7 +54,9 @@ def monte_carlo_strength(
     wins = ties = total = 0
 
     for _ in range(n_sim):
-        need = board_needed + 2
+        # need = board_needed + 2
+        opp_hole_count = len(my_cards) 
+        need = board_needed + opp_hole_count
         if len(deck) < need:
             break
         sample = random.sample(deck, need)
@@ -86,7 +88,7 @@ def choose_discard(
     hole: list,
     community: list,
     opp_discarded: list,
-    n_sim: int = 80
+    n_sim: int = 50 # decreased for faster decision-making during discard round
 ) -> tuple:
     best_idx = (0, 1)
     best_str = -1.0
@@ -145,7 +147,7 @@ class PlayerAgent(Agent):
         # ── Discard round (mandatory on flop) ─────────────────────────
         if valid_actions[ActionType.DISCARD.value]:
             if len(my_cards) == 5:
-                # 留出计算时间，这里的 n_sim 在 choose_discard 里默认设为 80 了
+                # 留出计算时间，这里的 n_sim 在 choose_discard 里默认设为 50 了
                 i, j = choose_discard(my_cards, community, opp_discarded)
             else:
                 i, j = 0, 1
@@ -157,7 +159,8 @@ class PlayerAgent(Agent):
 
         # ── Estimate hand strength ─────────────────────────────────────
         # 略微调低了初始阶段的模拟次数以保证不超时
-        n_sim = {0: 100, 1: 150, 2: 200, 3: 250}.get(street, 100)
+        # n_sim = {0: 100, 1: 150, 2: 200, 3: 250}.get(street, 100)
+        n_sim = {0: 50, 1: 100, 2: 150, 3: 200}.get(street, 50) # decreased for faster decision-making in early streets
         strength = monte_carlo_strength(my_cards, community, opp_discarded, n_sim)
 
         # 微调：面对强力加注时稍微扣点胜率预估
@@ -171,7 +174,7 @@ class PlayerAgent(Agent):
             f"call={call_amount} pot={pot}"
         )
 
-        # ── Betting decisions ──────────────────────────────────────────
+        # ── Betting decisions (with bluffing logic)────────────────────────────────
         if adj > 0.75:
             if can_raise:
                 frac = min(1.0, 0.5 + (adj - 0.75) * 2.0)
@@ -193,6 +196,43 @@ class PlayerAgent(Agent):
             if can_call and call_amount <= max(2, int(pot * 0.25)):
                 return call()
             return fold()
-
+        
+        # 4. 烂牌 (< 42%)：启动动态诈唬机制 (Dynamic Bluffing)
+        
+        # --- 计算动态诈唬概率 ---
+        base_raise_bluff = 0.05  # 基础加注诈唬率降到 5%
+        base_call_bluff  = 0.05  # 基础跟注诈唬率
+        
+        # 变量1：看对手脸色 (如果需要跟注的钱很少，或者对手过牌了，说明对手很软弱)
+        if call_amount == 0 or call_amount <= max(2, int(pot * 0.1)):
+            base_raise_bluff += 0.12  # 对手越弱，我越嚣张！诈唬加注率飙升到 17%
+        elif call_amount > int(pot * 0.5):
+            base_raise_bluff = 0.0    # 对手下重注，绝对不加注送死
+            base_call_bluff  = 0.0
+            
+        # 变量2：看比赛阶段 (越往后越收敛)
+        if street == 3: # 到了河牌圈，坚决少骗人
+            base_raise_bluff *= 0.2
+            base_call_bluff  *= 0.2
+            
+        # 变量3：加入随机“情绪”扰动 (让概率曲线产生噪音，防止被 RL 拟合)
+        jitter = random.uniform(-0.02, 0.03)
+        final_raise_bluff = max(0.0, base_raise_bluff + jitter)
+        final_call_bluff  = max(0.0, base_call_bluff + jitter)
+        
+        # --- 开始掷骰子 ---
+        bluff_roll = random.random()
+        
+        if bluff_roll < final_raise_bluff and can_raise:
+            self.logger.info(f"  *** DYNAMIC BLUFF RAISE! (Rate: {final_raise_bluff:.2f}) ***")
+            # 诈唬金额也随机化：下注底池的 25% 到 45% 之间
+            bluff_fraction = random.uniform(0.25, 0.45)
+            return make_raise(bluff_fraction)
+            
+        elif bluff_roll < (final_raise_bluff + final_call_bluff) and can_call and call_amount <= max(4, int(pot * 0.3)):
+            self.logger.info(f"  *** DYNAMIC BLUFF CALL! (Rate: {final_call_bluff:.2f}) ***")
+            return call()
+            
+        # 剩下的情况：老老实实认怂
         if can_check: return check()
         return fold()
