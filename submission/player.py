@@ -6,6 +6,7 @@ from functools import lru_cache  # <--- 引入 Python 的内存缓存神器
 from agents.agent import Agent
 from gym_env import PokerEnv
 from gym_env import WrappedEval
+import time
 
 # 引入官方动作和卡牌翻译官
 ActionType = PokerEnv.ActionType
@@ -42,9 +43,9 @@ def evaluate_best_hand(hole_str: list, board_str: list) -> int:
 # Monte Carlo simulation (Optimized & Cached)
 # ---------------------------------------------------------------------------
 @lru_cache(maxsize=2048)
-def cached_monte_carlo(my_cards_tuple, community_tuple, opp_discarded_tuple, n_sim: int) -> float:
+def cached_monte_carlo(my_cards_tuple, community_tuple, opp_discarded_tuple, my_discarded_tuple, n_sim: int) -> float:
     """性能优化2：缓存整场模拟结果，遇到同样的底牌+公共牌（比如加注大战），直接返回胜率"""
-    known = set(my_cards_tuple) | set(community_tuple) | set(opp_discarded_tuple)
+    known = set(my_cards_tuple) | set(community_tuple) | set(opp_discarded_tuple) | set(my_discarded_tuple)
     deck_ints = [c for c in range(27) if c not in known]
 
     board_needed = 5 - len(community_tuple)
@@ -80,22 +81,23 @@ def cached_monte_carlo(my_cards_tuple, community_tuple, opp_discarded_tuple, n_s
         return 0.5
     return (wins + 0.5 * ties) / total
 
-def monte_carlo_strength(my_cards: list, community: list, opp_discarded: list, n_sim: int = 200) -> float:
+def monte_carlo_strength(my_cards: list, community: list, opp_discarded: list, my_discarded: list, n_sim: int = 200) -> float:
     # 列表是不能被缓存的，必须转成不可变的 Tuple
-    return cached_monte_carlo(tuple(my_cards), tuple(community), tuple(opp_discarded), n_sim)
+    return cached_monte_carlo(tuple(my_cards), tuple(community), tuple(opp_discarded), tuple(my_discarded), n_sim)
 
 
 def choose_discard(
     hole: list,
     community: list,
     opp_discarded: list,
+    my_discarded: list,
     n_sim: int = 50 
 ) -> tuple:
     best_idx = (0, 1)
     best_str = -1.0
     for i, j in itertools.combinations(range(5), 2):
         kept = [hole[i], hole[j]]
-        s = monte_carlo_strength(kept, community, opp_discarded, n_sim)
+        s = monte_carlo_strength(kept, community, opp_discarded, my_discarded, n_sim)
         if s > best_str:
             best_str = s
             best_idx = (i, j)
@@ -109,17 +111,30 @@ class PlayerAgent(Agent):
     def __init__(self, stream: bool = True):
         super().__init__(stream)
         self.action_types = ActionType
+        # --- 新增：全域資源與狀態追蹤 ---
+        self.start_time = time.time()
+        # 設定安全時間閾值 (Phase 3 限制為 1500 秒，預留 50 秒作為緩衝)
+        self.time_limit = 450.0 
+        self.total_hands = 1000
+        self.net_chips = 0.0  # 追蹤我方累積淨收益
+        self.is_guaranteed_win = False
 
     def __name__(self):
         return "PlayerAgent"
 
     def act(self, observation, reward, terminated, truncated, info):
         # self.logger.info(f"Hand {info.get('hand_number', '?')} street {observation['street']}")
+        if reward is not None:
+            self.net_chips += reward
+        current_hand = info.get('hand_number', 1)
+        hands_left =    self.total_hands - current_hand + 1
+
 
         valid_actions = observation["valid_actions"]
         my_cards      = valid_cards(observation["my_cards"])
         community     = valid_cards(observation["community_cards"])
         opp_discarded = valid_cards(observation["opp_discarded_cards"])
+        my_discarded  = valid_cards(observation["my_discarded_cards"])
         my_bet        = observation["my_bet"]
         opp_bet       = observation["opp_bet"]
         min_raise     = observation["min_raise"]
@@ -142,34 +157,115 @@ class PlayerAgent(Agent):
         def fold():  return ActionType.FOLD.value,  0, 0, 0
         def call():  return ActionType.CALL.value,  0, 0, 0
         def check(): return ActionType.CHECK.value, 0, 0, 0
+        
+        # =========================================================================
+        # 第一步：必勝鎖定 (最高優先級！)
+        # =========================================================================
+        # 如果還沒鎖定，檢查是否達標
+        if not self.is_guaranteed_win:
+            max_possible_loss = hands_left * 2
+            if self.net_chips > max_possible_loss:
+                self.is_guaranteed_win = True  # 狀態切換：永久進入必勝模式
+                self.logger.info(f"狀態切換：必勝鎖定！淨賺 {self.net_chips} > 極限損失 {max_possible_loss}。永久進入龜縮模式。")
 
-        # ── Discard round (mandatory on flop) ─────────────────────────
+        # 只要處於必勝狀態，無腦執行 O(1) 逃脫邏輯
+        if self.is_guaranteed_win:
+            # 強制換牌階段 (Street 1) 必須選兩張牌保留 [cite: 36, 449]
+            if valid_actions[ActionType.DISCARD.value]:
+                return ActionType.DISCARD.value, 0, 0, 1
+            if valid_actions[ActionType.FOLD.value]:
+                return fold()
+            return check()
+
+        # =========================================================================
+        # 第二步：加權預算池與動態算力分配 (Weighted Time Pool)
+        # =========================================================================
+        elapsed_time = time.time() - self.start_time
+        time_remaining = max(0.1, self.time_limit - elapsed_time)
+
+        # 1. 設定我們「理想中」每手牌的耗時目標 (前期給極大寬容度，後期壓縮)
+        early_cost_target = 0.85  # 前 400 手，每把允許吃 0.85 秒
+        late_cost_target = 0.15   # 後 600 手，每把只給 0.15 秒 (因為有很多局會直接 Fold，0.15 很夠)
+
+        # 2. 計算剩餘回合數 (嚴格區分前期與後期)
+        if current_hand <= 400:
+            early_hands_left = 400 - current_hand + 1
+            late_hands_left = self.total_hands - 400
+            
+            # 前期：較高的基礎模擬次數
+            base_n_sim = {0: 100, 1: 150, 2: 200, 3: 250}.get(street, 100)
+        else:
+            early_hands_left = 0
+            late_hands_left = self.total_hands - current_hand + 1
+            
+            # 中後期：保守的模擬次數
+            base_n_sim = {0: 50, 1: 100, 2: 150, 3: 200}.get(street, 50)
+
+        # 3. 結算：如果照這個奢侈的計畫打到最後，還需要多少秒？
+        total_needed_budget = (early_hands_left * early_cost_target) + (late_hands_left * late_cost_target)
+
+        # 4. 算力倍率：我擁有的時間 / 我需要的時間
+        sim_multiplier = time_remaining / max(1.0, total_needed_budget)
+
+        # 5. 安全鉗制與套用
+        if sim_multiplier < 0.9:
+            # self.logger.warning(f"⚠️ 總預算落後！啟動降速，multiplier: {sim_multiplier:.2f}")
+            self.logger.warning(f"Time budget fall behind, reduce speed multiplier: {sim_multiplier:.2f}")
+        
+        # 防止過度膨脹或過度壓縮 (最高 2.0 倍，最低 0.2 倍)
+        sim_multiplier = max(0.2, min(2.0, sim_multiplier))
+
+        n_sim = int(base_n_sim * sim_multiplier)
+        n_sim = max(10, n_sim) # 底線防禦
+        
+        self.logger.info(f"Hand {current_hand} | Street {street} | Time left: {time_remaining:.1f}s | multiplier: {sim_multiplier:.2f} | n_sim: {n_sim}")
+
+        # =========================================================================
+        # 第三步：處理強制換牌 (現在可以吃到動態 n_sim 了)
+        # =========================================================================
         if valid_actions[ActionType.DISCARD.value]:
             if len(my_cards) == 5:
-                best_idx, _ = choose_discard(my_cards, community, opp_discarded)
+                # 這裡補上 n_sim，讓換牌決策也能根據剩餘時間縮放算力
+                best_idx, _ = choose_discard(my_cards, community, opp_discarded, my_discarded, n_sim=n_sim)
                 i, j = best_idx
             else:
                 i, j = 0, 1
             return ActionType.DISCARD.value, 0, i, j
-
+        
+        # =========================================================================
+        # 第四步：常規下注與詐唬邏輯
+        # =========================================================================
         # ── Safety check ──────────────────────────────────────────────
         if len(my_cards) < 2:
             return check() if can_check else fold()
-
         # ── Estimate hand strength ─────────────────────────────────────
-        # 因为现在速度极快，你甚至可以把这里的模拟次数往上调了！我们暂且保留原参数，保证100%不超时。
-        n_sim = {0: 50, 1: 100, 2: 150, 3: 200}.get(street, 50) 
-        
         if len(my_cards) == 5:
-            _, strength = choose_discard(my_cards, community, opp_discarded, n_sim = n_sim)
+            _, strength = choose_discard(my_cards, community, opp_discarded, my_discarded, n_sim = n_sim)
         else:
-            strength = monte_carlo_strength(my_cards, community, opp_discarded, n_sim)
+            strength = monte_carlo_strength(my_cards, community, opp_discarded, my_discarded, n_sim)
 
         # 微调：面对强力加注时稍微扣点胜率预估
         opp_aggressive = (opp_bet > my_bet and opp_bet > 4)
         adj = strength - (0.05 if opp_aggressive else 0.0)
 
         pot_odds = call_amount / (pot + call_amount + 1e-9)
+
+        # 🛑 新增：高方差防禦護盾 (Anti-Variance Shield)
+        if call_amount > 35:
+            # 根據實際威脅程度 (佔最大下注的比例) 計算風險溢價，最高要求額外 15% 勝率
+            risk_premium = (call_amount / 100.0) * 0.15 
+            
+            # 動態安全線：底池賠率 + 風險溢價
+            safe_call_threshold = pot_odds + risk_premium
+            
+            # 絕對底線防禦：設定在 0.65 到 0.70 之間比較適合 27 張牌的生態
+            # 確保不會要求不切實際的高勝率
+            safe_call_threshold = min(0.70, safe_call_threshold)
+            
+            if adj < safe_call_threshold:
+                # self.logger.info(f"🛡️ 觸發防護盾：拒絕極端下注！要求跟注 {call_amount}，牌力 {adj:.2f} < 安全線 {safe_call_threshold:.2f}")
+                self.logger.info(f"Shield: No extreme bid, call amount: {call_amount}, ajd: {adj:.2f} < safty_threshold: {safe_call_threshold:.2f}")
+                return check() if can_check else fold()
 
         # ── Betting decisions (with bluffing logic)────────────────────────────────
         if adj > 0.75:
