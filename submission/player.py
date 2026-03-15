@@ -54,6 +54,7 @@ def monte_carlo_strength(
     wins = ties = total = 0
 
     for _ in range(n_sim):
+        # 动态获取对手的底牌数量（保证永远是绝对公平的 2打2）
         # need = board_needed + 2
         opp_hole_count = len(my_cards) 
         need = board_needed + opp_hole_count
@@ -98,7 +99,7 @@ def choose_discard(
         if s > best_str:
             best_str = s
             best_idx = (i, j)
-    return best_idx
+    return best_idx, best_str
 
 # ---------------------------------------------------------------------------
 # Player Agent
@@ -148,7 +149,8 @@ class PlayerAgent(Agent):
         if valid_actions[ActionType.DISCARD.value]:
             if len(my_cards) == 5:
                 # 留出计算时间，这里的 n_sim 在 choose_discard 里默认设为 50 了
-                i, j = choose_discard(my_cards, community, opp_discarded)
+                best_idx, _ = choose_discard(my_cards, community, opp_discarded)
+                i, j = best_idx
             else:
                 i, j = 0, 1
             return ActionType.DISCARD.value, 0, i, j
@@ -160,8 +162,13 @@ class PlayerAgent(Agent):
         # ── Estimate hand strength ─────────────────────────────────────
         # 略微调低了初始阶段的模拟次数以保证不超时
         # n_sim = {0: 100, 1: 150, 2: 200, 3: 250}.get(street, 100)
+        # strength = monte_carlo_strength(my_cards, community, opp_discarded, n_sim)
         n_sim = {0: 50, 1: 100, 2: 150, 3: 200}.get(street, 50) # decreased for faster decision-making in early streets
-        strength = monte_carlo_strength(my_cards, community, opp_discarded, n_sim)
+        if len(my_cards) == 5:
+            # 【核心修复】：翻牌前 (Street 0)，直接获取最佳的 2 张牌的真实胜率，拒绝虚假自信！
+            _, strength = choose_discard(my_cards, community, opp_discarded, n_sim = n_sim)
+        else:
+            strength = monte_carlo_strength(my_cards, community, opp_discarded, n_sim)
 
         # 微调：面对强力加注时稍微扣点胜率预估
         opp_aggressive = (opp_bet > my_bet and opp_bet > 4)
