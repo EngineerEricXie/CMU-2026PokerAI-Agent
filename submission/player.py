@@ -123,9 +123,9 @@ class PlayerAgent(Agent):
         return "PlayerAgent"
 
     def act(self, observation, reward, terminated, truncated, info):
+        # self.logger.info(f"Info Keys: {info.keys()}, Reward: {reward}")
         # self.logger.info(f"Hand {info.get('hand_number', '?')} street {observation['street']}")
-        if reward is not None:
-            self.net_chips += reward
+
         current_hand = info.get('hand_number', 1)
         hands_left =    self.total_hands - current_hand + 1
 
@@ -318,3 +318,23 @@ class PlayerAgent(Agent):
             
         if can_check: return check()
         return fold()
+    def observe(self, observation, reward, terminated, truncated, info):
+        """
+        環境廣播狀態與結算的隱藏函數。
+        當手牌結束 (terminated = True) 時，這裡的 reward 就是你這把牌真正的淨收益！
+        """
+        # 1. 攔截真正的結算籌碼
+        if reward is not None and reward != 0.0:
+            self.net_chips += reward
+            self.logger.info(f"Getting current game reward : {reward}, Overall reward: {self.net_chips}")
+
+        # 2. 可選：當手牌結束時，印出目前的進度，方便你監控必勝鎖定是否快觸發了
+        if terminated:
+            current_hand = info.get('hand_number', 1)
+            hands_left = self.total_hands - current_hand
+            max_possible_loss = hands_left * 2
+            self.logger.info(f"🏁 Hand {current_hand} finished | Total earnings: {self.net_chips} | Distance to locking win (Max possible loss): {max_possible_loss}")
+            
+            # 你也可以保留對手的 showdown 資訊方便覆盤
+            # if "player_0_cards" in info:
+                # self.logger.debug(f"攤牌: {info['player_0_cards']} vs {info['player_1_cards']} ボード {info['community_cards']}")
