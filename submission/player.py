@@ -226,8 +226,8 @@ class PlayerAgent(Agent):
         time_remaining = max(0.1, self.time_limit - self.my_total_think_time)
 
         # 1. 設定我們「理想中」每手牌的耗時目標 (前期給極大寬容度，後期壓縮)
-        early_cost_target = 0.85  # 前 400 手，每把允許吃 0.85 秒
-        late_cost_target = 0.15   # 後 600 手，每把只給 0.15 秒 (因為有很多局會直接 Fold，0.15 很夠)
+        early_cost_target = 1.0  # 前 400 手，每把允許吃 0.85 秒
+        late_cost_target = 0.2   # 後 600 手，每把只給 0.15 秒 (因為有很多局會直接 Fold，0.15 很夠)
 
         # 2. 計算剩餘回合數 (嚴格區分前期與後期)
         if current_hand <= 400:
@@ -235,13 +235,13 @@ class PlayerAgent(Agent):
             late_hands_left = self.total_hands - 400
             
             # 前期：較高的基礎模擬次數
-            base_n_sim = {0: 100, 1: 150, 2: 200, 3: 250}.get(street, 100)
+            base_n_sim = {0: 150, 1: 250, 2: 300, 3: 400}.get(street, 150)
         else:
             early_hands_left = 0
             late_hands_left = self.total_hands - current_hand + 1
             
             # 中後期：保守的模擬次數
-            base_n_sim = {0: 50, 1: 100, 2: 150, 3: 200}.get(street, 50)
+            base_n_sim = {0: 80, 1: 150, 2: 250, 3: 300}.get(street, 80)
 
         # 3. 結算：如果照這個奢侈的計畫打到最後，還需要多少秒？
         total_needed_budget = (early_hands_left * early_cost_target) + (late_hands_left * late_cost_target)
@@ -298,17 +298,17 @@ class PlayerAgent(Agent):
             k_marg  = "PR_50"  # 稍後用 offset 降到 PR_30
         elif street == 1:
             # Flop (換牌後): 牌力初步成型，開始過濾爛牌
-            k_raise = "PR_80" 
-            k_call  = "PR_60"  
+            k_raise = "PR_70" 
+            k_call  = "PR_50"  
             k_marg  = "PR_50"
         elif street == 2:
             # Turn: 轉牌圈，牌力逐漸明朗，抓緊價值
-            k_raise = "PR_90"  
+            k_raise = "PR_80"  
             k_call  = "PR_60"
             k_marg  = "PR_50"
         else: 
             # River: 對手圖窮匕見，拿前 20% (PR_80) 的牌狠狠榨取他們
-            k_raise = "PR_90"  
+            k_raise = "PR_80"  
             k_call  = "PR_60"
             k_marg  = "PR_50"
             
