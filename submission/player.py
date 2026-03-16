@@ -7,8 +7,6 @@ from agents.agent import Agent
 from gym_env import PokerEnv
 from gym_env import WrappedEval
 import time
-import os
-import json
 
 # 引入官方动作和卡牌翻译官
 ActionType = PokerEnv.ActionType
@@ -122,33 +120,6 @@ class PlayerAgent(Agent):
         self.is_guaranteed_win = False
         self.my_total_think_time = 0.0
 
-        self.dynamic_thresholds = {}
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # for mc in [10, 30, 50, 100, 150, 200, 250]:
-        for mc in [50, 100, 150, 200]:
-            filename = os.path.join(base_dir, f"thresholds_mc{mc}.json")
-            if os.path.exists(filename):
-                try:
-                    with open(filename, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        mc_key = int(list(data.keys())[0])
-                        self.dynamic_thresholds[mc_key] = {int(k): v for k, v in data[str(mc_key)].items()}
-                    # 可以取消註解下面這行來確認是否成功讀取
-                    self.logger.info(f"Read successfully: {filename}")
-                except Exception as e:
-                    self.logger.warning(f"Reading {filename} error: {e}")
-        # 如果因為任何原因 (例如忘記上傳 JSON 到比賽伺服器) 導致沒讀到任何檔案
-        if not self.dynamic_thresholds:
-            self.logger.warning("Cannot find json file, use hard coded value。")
-            # 放一組偏保守的預設數字 (大約是 mc_sims=150 的水準)
-            self.dynamic_thresholds[150] = {
-                0: {"raise": 0.690, "call": 0.640, "marginal": 0.613, "PR_80": 0.660, "PR_60": 0.625, "PR_50": 0.613},
-                1: {"raise": 0.877, "call": 0.760, "marginal": 0.680},
-                2: {"raise": 0.940, "call": 0.800, "marginal": 0.687},
-                3: {"raise": 0.990, "call": 0.880, "marginal": 0.732},
-            }
-
     def __name__(self):
         return "PlayerAgent"
 
@@ -211,7 +182,6 @@ class PlayerAgent(Agent):
         if self.is_guaranteed_win:
             # 強制換牌階段 (Street 1) 必須選兩張牌保留 [cite: 36, 449]
             if valid_actions[ActionType.DISCARD.value]:
-                # return ActionType.DISCARD.value, 0, 0, 1
                 return do_discard(0, 1)
             if valid_actions[ActionType.FOLD.value]:
                 return fold()
@@ -222,7 +192,6 @@ class PlayerAgent(Agent):
         # =========================================================================
         elapsed_time = time.perf_counter() - self.start_time
         # time_remaining = max(0.1, self.time_limit - elapsed_time)
-        # 🏆 修正：改用我們自己的專屬碼表來計算剩餘時間
         time_remaining = max(0.1, self.time_limit - self.my_total_think_time)
 
         # 1. 設定我們「理想中」每手牌的耗時目標 (前期給極大寬容度，後期壓縮)
@@ -251,6 +220,7 @@ class PlayerAgent(Agent):
 
         # 5. 安全鉗制與套用
         if sim_multiplier < 0.9:
+            # self.logger.warning(f"⚠️ 總預算落後！啟動降速，multiplier: {sim_multiplier:.2f}")
             self.logger.warning(f"Time budget fall behind, reduce speed multiplier: {sim_multiplier:.2f}")
         
         # 防止過度膨脹或過度壓縮 (最高 2.0 倍，最低 0.2 倍)
@@ -258,7 +228,6 @@ class PlayerAgent(Agent):
 
         n_sim = int(base_n_sim * sim_multiplier)
         n_sim = max(10, n_sim) # 底線防禦
-        # n_sim = int(round(n_sim / 10.0) * 10)
         
         self.logger.info(f"Hand {current_hand} | Street {street} | Time left: {time_remaining:.1f}s | multiplier: {sim_multiplier:.2f} | n_sim: {n_sim}")
 
@@ -275,139 +244,64 @@ class PlayerAgent(Agent):
             return do_discard(i, j)
         
         # =========================================================================
-        # 第四步：常規下注與詐唬邏輯 (搭載蒙地卡羅分佈測量數據)
+        # 第四步：常規下注與詐唬邏輯
         # =========================================================================
         # ── Safety check ──────────────────────────────────────────────
         if len(my_cards) < 2:
             return check() if can_check else fold()
-            
         # ── Estimate hand strength ─────────────────────────────────────
         if len(my_cards) == 5:
-            _, strength = choose_discard(my_cards, community, opp_discarded, my_discarded, n_sim=n_sim)
+            _, strength = choose_discard(my_cards, community, opp_discarded, my_discarded, n_sim = n_sim)
         else:
             strength = monte_carlo_strength(my_cards, community, opp_discarded, my_discarded, n_sim)
 
+        # 微调：面对强力加注时稍微扣点胜率预估
         opp_aggressive = (opp_bet > my_bet and opp_bet > 4)
         adj = strength - (0.05 if opp_aggressive else 0.0)
+
         pot_odds = call_amount / (pot + call_amount + 1e-9)
 
-        if street == 0:
-            # Pre-flop: 極度寬鬆！捍衛盲注，多看翻牌
-            k_raise = "PR_70"  # 前 30% 就主動加注，壓制對手
-            k_call  = "PR_50"  # 前 50% 都跟注 (甚至 PR_30 也可以)
-            k_marg  = "PR_50"  # 稍後用 offset 降到 PR_30
-        elif street == 1:
-            # Flop (換牌後): 牌力初步成型，開始過濾爛牌
-            k_raise = "PR_80" 
-            k_call  = "PR_60"  
-            k_marg  = "PR_50"
-        elif street == 2:
-            # Turn: 轉牌圈，牌力逐漸明朗，抓緊價值
-            k_raise = "PR_90"  
-            k_call  = "PR_60"
-            k_marg  = "PR_50"
-        else: 
-            # River: 對手圖窮匕見，拿前 20% (PR_80) 的牌狠狠榨取他們
-            k_raise = "PR_90"  
-            k_call  = "PR_60"
-            k_marg  = "PR_50"
-            
-        k_nuts = "PR_95" # 🏆 新增：用來懲罰瘋魚的極限堅果牌 Key
-
-        # 1. 取得你目前載入的所有算力錨點並排序 (例如: [30, 100, 150, 200])
-        anchor_levels = sorted(list(self.dynamic_thresholds.keys()))
-        
-        # 2. 邊界鉗制：如果算力超出我們測量的極限，直接使用極值
-        if n_sim <= anchor_levels[0]:
-            t_raise = self.dynamic_thresholds[anchor_levels[0]][street][k_raise]
-            t_call  = self.dynamic_thresholds[anchor_levels[0]][street][k_call]
-            t_marg  = self.dynamic_thresholds[anchor_levels[0]][street][k_marg]
-            t_nuts  = self.dynamic_thresholds[anchor_levels[0]][street].get(k_nuts, 0.95)
-        elif n_sim >= anchor_levels[-1]:
-            t_raise = self.dynamic_thresholds[anchor_levels[-1]][street][k_raise]
-            t_call  = self.dynamic_thresholds[anchor_levels[-1]][street][k_call]
-            t_marg  = self.dynamic_thresholds[anchor_levels[-1]][street][k_marg]
-            t_nuts  = self.dynamic_thresholds[anchor_levels[-1]][street].get(k_nuts, 0.95)
-        else:
-            # 3. 尋找 n_sim 落在哪兩個錨點之間 (x0 和 x1)
-            for i in range(len(anchor_levels) - 1):
-                x0 = anchor_levels[i]
-                x1 = anchor_levels[i+1]
-                
-                if x0 <= n_sim <= x1:
-                    # 計算插值比例 (0.0 ~ 1.0)
-                    ratio = (n_sim - x0) / (x1 - x0)
-                    
-                    # 抓出 x0 和 x1 對應的 y 值
-                    y0_raise = self.dynamic_thresholds[x0][street][k_raise]
-                    y1_raise = self.dynamic_thresholds[x1][street][k_raise]
-                    
-                    y0_call  = self.dynamic_thresholds[x0][street][k_call]
-                    y1_call  = self.dynamic_thresholds[x1][street][k_call]
-                    
-                    y0_marg  = self.dynamic_thresholds[x0][street][k_marg]
-                    y1_marg  = self.dynamic_thresholds[x1][street][k_marg]
-                    
-                    # 處理防呆：萬一舊的 JSON 沒存到 PR_95，預設給 0.95
-                    y0_nuts  = self.dynamic_thresholds[x0][street].get(k_nuts, 0.95)
-                    y1_nuts  = self.dynamic_thresholds[x1][street].get(k_nuts, 0.95)
-                    
-                    # 執行數學線性插值公式
-                    t_raise = y0_raise + ratio * (y1_raise - y0_raise)
-                    t_call  = y0_call  + ratio * (y1_call  - y0_call)
-                    t_marg  = y0_marg  + ratio * (y1_marg  - y0_marg)
-                    t_nuts  = y0_nuts  + ratio * (y1_nuts  - y0_nuts)
-                    break
-        
-        # 🛡️ 微調：讓 Street 0 的邊緣及格線再低一點，避免一開始瘋狂棄牌
-        if street == 0:
-            t_marg -= 0.08
-        
-        # 🛑 高方差防禦護盾 (Anti-Variance Shield)
+        # 🛑 新增：高方差防禦護盾 (Anti-Variance Shield)
         if call_amount > 35:
+            # 根據實際威脅程度 (佔最大下注的比例) 計算風險溢價，最高要求額外 15% 勝率
             risk_premium = (call_amount / 100.0) * 0.15 
+            
+            # 動態安全線：底池賠率 + 風險溢價
             safe_call_threshold = pot_odds + risk_premium
             
-            # 使用當前 Street 的 t_call 作為絕對底線，避免用爛牌接 All-in
-            safe_call_threshold = min(t_call, safe_call_threshold)
+            # 絕對底線防禦：設定在 0.65 到 0.70 之間比較適合 27 張牌的生態
+            # 確保不會要求不切實際的高勝率
+            safe_call_threshold = min(0.70, safe_call_threshold)
             
             if adj < safe_call_threshold:
-                self.logger.info(f"🛡️ 觸發防護盾：要求跟注 {call_amount}, 牌力 {adj:.2f} < 安全線 {safe_call_threshold:.2f}")
+                # self.logger.info(f"🛡️ 觸發防護盾：拒絕極端下注！要求跟注 {call_amount}，牌力 {adj:.2f} < 安全線 {safe_call_threshold:.2f}")
+                self.logger.info(f"Shield: No extreme bid, call amount: {call_amount}, ajd: {adj:.2f} < safty_threshold: {safe_call_threshold:.2f}")
                 return check() if can_check else fold()
 
-        # ── Betting decisions (智能匹配當前 Street 的強度) ────────────────
-        # 1. 超強牌 (前 20% ~ 30%)
-        if adj >= t_raise:
+        # ── Betting decisions (with bluffing logic)────────────────────────────────
+        if adj > 0.75:
             if can_raise:
-                # 💥 瘋魚懲罰機制：如果對手下注極大，且我們牌力大於插值算出來的極限堅果線 (t_nuts)
-                if opp_aggressive and adj >= t_nuts:
-                    return make_raise(1.0) # 直接 Max Raise / All-in
-                
-                # 根據超過閾值的程度決定加注大小 (越接近 PR95 加注越重)
-                frac = min(1.0, 0.5 + (adj - t_raise) * 2.5)
+                frac = min(1.0, 0.5 + (adj - 0.75) * 2.0)
                 return make_raise(frac)
             if can_call:  return call()
             return check()
 
-        # 2. 強牌 (前 30%)
-        if adj >= t_call:
-            if can_raise and adj > (t_raise + t_call) / 2.0:
-                return make_raise(0.25) # 接近超強牌時可以小建樹
+        if adj > 0.60:
+            if can_raise and adj > 0.68:
+                return make_raise(0.25)
             if can_call and adj > pot_odds + 0.05:
                 return call()
             if can_check: return check()
             if can_call:  return call()
             return fold()
 
-        # 3. 中庸牌 (前 50%)
-        if adj >= t_marg:
+        if adj > 0.42:
             if can_check: return check()
-            # 只有在代價很小的時候才跟注看牌
             if can_call and call_amount <= max(2, int(pot * 0.25)):
                 return call()
             return fold()
         
-        # 4. 爛牌 (< PR50)：啟動動態詐唬機制 (Dynamic Bluffing)
+        # 4. 烂牌 (< 42%)：启动动态诈唬机制 (Dynamic Bluffing)
         base_raise_bluff = 0.05  
         base_call_bluff  = 0.05  
         
@@ -435,7 +329,6 @@ class PlayerAgent(Agent):
             
         if can_check: return check()
         return fold()
-    
     def observe(self, observation, reward, terminated, truncated, info):
         """
         環境廣播狀態與結算的隱藏函數。
