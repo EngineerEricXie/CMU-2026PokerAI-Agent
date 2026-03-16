@@ -26,7 +26,7 @@ def valid_cards(card_tuple) -> list:
 # ---------------------------------------------------------------------------
 # Hand evaluator (Using Official Engine with Cache)
 # ---------------------------------------------------------------------------
-@lru_cache(maxsize=20000)
+@lru_cache(maxsize=200000)
 def cached_evaluate_best_hand(all_cards_tuple) -> int:
     """性能优化1：缓存7张牌的算牌结果，遇到同样的牌面直接从内存拿结果，不重算"""
     best_score = float('inf')
@@ -44,7 +44,7 @@ def evaluate_best_hand(hole_str: list, board_str: list) -> int:
 # ---------------------------------------------------------------------------
 # Monte Carlo simulation (Optimized & Cached)
 # ---------------------------------------------------------------------------
-@lru_cache(maxsize=2048)
+@lru_cache(maxsize=10000)
 def cached_monte_carlo(my_cards_tuple, community_tuple, opp_discarded_tuple, my_discarded_tuple, n_sim: int) -> float:
     """性能优化2：缓存整场模拟结果，遇到同样的底牌+公共牌（比如加注大战），直接返回胜率"""
     known = set(my_cards_tuple) | set(community_tuple) | set(opp_discarded_tuple) | set(my_discarded_tuple)
@@ -116,7 +116,7 @@ class PlayerAgent(Agent):
         # --- 新增：全域資源與狀態追蹤 ---
         self.start_time = time.perf_counter()
         # 設定安全時間閾值 (Phase 3 限制為 1500 秒，預留 50 秒作為緩衝)
-        self.time_limit = 450.0 
+        self.time_limit = 980.0 
         self.total_hands = 1000
         self.net_chips = 0.0  # 追蹤我方累積淨收益
         self.is_guaranteed_win = False
@@ -226,8 +226,8 @@ class PlayerAgent(Agent):
         time_remaining = max(0.1, self.time_limit - self.my_total_think_time)
 
         # 1. 設定我們「理想中」每手牌的耗時目標 (前期給極大寬容度，後期壓縮)
-        early_cost_target = 1.0  # 前 400 手，每把允許吃 0.85 秒
-        late_cost_target = 0.2   # 後 600 手，每把只給 0.15 秒 (因為有很多局會直接 Fold，0.15 很夠)
+        early_cost_target = 1.5  # 前 400 手，每把允許吃 0.85 秒
+        late_cost_target = 0.6   # 後 600 手，每把只給 0.15 秒 (因為有很多局會直接 Fold，0.15 很夠)
 
         # 2. 計算剩餘回合數 (嚴格區分前期與後期)
         if current_hand <= 400:
@@ -235,13 +235,13 @@ class PlayerAgent(Agent):
             late_hands_left = self.total_hands - 400
             
             # 前期：較高的基礎模擬次數
-            base_n_sim = {0: 150, 1: 250, 2: 300, 3: 400}.get(street, 150)
+            base_n_sim = {0: 300, 1: 400, 2: 600, 3: 800}.get(street, 300)
         else:
             early_hands_left = 0
             late_hands_left = self.total_hands - current_hand + 1
             
             # 中後期：保守的模擬次數
-            base_n_sim = {0: 80, 1: 150, 2: 250, 3: 300}.get(street, 80)
+            base_n_sim = {0: 200, 1: 300, 2: 400, 3: 600}.get(street, 200)
 
         # 3. 結算：如果照這個奢侈的計畫打到最後，還需要多少秒？
         total_needed_budget = (early_hands_left * early_cost_target) + (late_hands_left * late_cost_target)
@@ -253,8 +253,8 @@ class PlayerAgent(Agent):
         if sim_multiplier < 0.9:
             self.logger.warning(f"Time budget fall behind, reduce speed multiplier: {sim_multiplier:.2f}")
         
-        # 防止過度膨脹或過度壓縮 (最高 2.0 倍，最低 0.2 倍)
-        sim_multiplier = max(0.2, min(2.0, sim_multiplier))
+        # 最高允許倍率擴張到 3.0 倍！
+        sim_multiplier = max(0.2, min(3.0, sim_multiplier))
 
         n_sim = int(base_n_sim * sim_multiplier)
         n_sim = max(10, n_sim) # 底線防禦
