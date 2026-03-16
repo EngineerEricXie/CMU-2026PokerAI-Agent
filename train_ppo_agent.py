@@ -11,10 +11,13 @@ import multiprocessing as mp
 from gym_env import PokerEnv
 from agents.agent import Agent
 from agents.prob_agent import ProbabilityAgent
-from agents.v10 import V10
+from agents.v10_old import V10
 
 import json
 import wandb
+
+import logging
+
 
 # 1. 在檔案全域載入勝率表
 PREFLOP_TABLE = {}
@@ -257,6 +260,13 @@ def collect_trajectories_worker(worker_id, shared_weights, episodes_per_worker):
     local_agent.policy.load_state_dict(shared_weights)
     
     opponent_agent = V10()
+    # 【加入這行】強制把 V10 的日誌等級調高到 WARNING，這樣 INFO 就不會印出來了
+    if hasattr(opponent_agent, 'logger'):
+        opponent_agent.logger.setLevel(logging.WARNING)
+        
+        # 為了保險起見，把該 logger 的所有 handler 也強制設定
+        for handler in opponent_agent.logger.handlers:
+            handler.setLevel(logging.WARNING)
     episode_rewards = []
 
     for _ in range(episodes_per_worker):
@@ -295,7 +305,7 @@ def collect_trajectories_worker(worker_id, shared_weights, episodes_per_worker):
             total_reward += r
 
             if done and last_state is not None:
-                local_agent.store_transition(last_state, last_valid_acts, last_raw_acts, last_log_prob, last_val, r, True)
+                local_agent.store_transition(last_state, last_valid_acts, last_raw_acts, last_log_prob, last_val, r/100, True)
                 last_state = None 
 
         episode_rewards.append(total_reward)
@@ -313,7 +323,7 @@ def train_agent(num_episodes=10000, episodes_per_iteration=380, save_every=500, 
             "episodes": num_episodes,
             "episodes_per_iteration": episodes_per_iteration,
             "hidden_dim": 128,
-            "lr": 3e-4,
+            "lr": 1e-4, # 【修改】改成 1e-4
             "gamma": 0.99
         }
     )
@@ -323,7 +333,7 @@ def train_agent(num_episodes=10000, episodes_per_iteration=380, save_every=500, 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Global Agent using device: {device}")
     
-    global_agent = PPOAgent(input_dim=INPUT_DIM)
+    global_agent = PPOAgent(input_dim=INPUT_DIM, lr=1e-4) 
     global_agent.policy.to(device)
 
     # 設定多進程數量 (留一個 CPU 核心給主進程)
@@ -389,4 +399,8 @@ def train_agent(num_episodes=10000, episodes_per_iteration=380, save_every=500, 
 if __name__ == "__main__":
     # Windows/MacOS 需要這行來啟動多進程
     mp.set_start_method('spawn', force=True)
-    train_agent(num_episodes=10000)
+    train_agent(
+        num_episodes=500000,           # 總訓練局數拉長到 50 萬局
+        episodes_per_iteration=1900,   # 【關鍵修改】每次收集 1900 局再更新
+        save_every=5000                # 每 5000 局存一次檔就好
+    )
