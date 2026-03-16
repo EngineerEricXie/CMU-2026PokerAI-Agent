@@ -208,9 +208,9 @@ class V10(Agent):
         sim_multiplier = time_remaining / max(1.0, total_needed_budget)
 
         # 5. 安全鉗制與套用
-        if sim_multiplier < 0.9:
+        # if sim_multiplier < 0.9:
             # self.logger.warning(f"⚠️ 總預算落後！啟動降速，multiplier: {sim_multiplier:.2f}")
-            self.logger.warning(f"Time budget fall behind, reduce speed multiplier: {sim_multiplier:.2f}")
+            # self.logger.warning(f"Time budget fall behind, reduce speed multiplier: {sim_multiplier:.2f}")
         
         # 防止過度膨脹或過度壓縮 (最高 2.0 倍，最低 0.2 倍)
         sim_multiplier = max(0.2, min(2.0, sim_multiplier))
