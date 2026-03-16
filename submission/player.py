@@ -258,7 +258,7 @@ class PlayerAgent(Agent):
 
         n_sim = int(base_n_sim * sim_multiplier)
         n_sim = max(10, n_sim) # 底線防禦
-        # n_sim = int(round(n_sim / 10.0) * 10)
+        n_sim = int(round(n_sim / 10.0) * 10)
         
         self.logger.info(f"Hand {current_hand} | Street {street} | Time left: {time_remaining:.1f}s | multiplier: {sim_multiplier:.2f} | n_sim: {n_sim}")
 
