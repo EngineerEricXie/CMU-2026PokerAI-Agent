@@ -120,6 +120,7 @@ class V11(Agent):
         self.total_hands = 1000
         self.net_chips = 0.0  # 追蹤我方累積淨收益
         self.is_guaranteed_win = False
+        self.my_total_think_time = 0.0
 
         self.dynamic_thresholds = {}
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -152,6 +153,7 @@ class V11(Agent):
         return "V11"
 
     def act(self, observation, reward, terminated, truncated, info):
+        act_start_time = time.perf_counter()
         # self.logger.info(f"Info Keys: {info.keys()}, Reward: {reward}")
         # self.logger.info(f"Hand {info.get('hand_number', '?')} street {observation['street']}")
 
@@ -178,14 +180,21 @@ class V11(Agent):
         can_check = valid_actions[ActionType.CHECK.value]
 
         # ── Helpers ───────────────────────────────────────────────────
+        def record_and_return(action_tuple):
+            # 結算本次 act() 真正花費的時間，並存入總思考時間
+            self.my_total_think_time += (time.perf_counter() - act_start_time)
+            return action_tuple
+
         def make_raise(fraction: float):
             amt = int(min_raise + (max_raise - min_raise) * fraction)
             amt = max(min_raise, min(max_raise, amt))
-            return ActionType.RAISE.value, amt, 0, 0
+            return record_and_return((ActionType.RAISE.value, amt, 0, 0))
 
-        def fold():  return ActionType.FOLD.value,  0, 0, 0
-        def call():  return ActionType.CALL.value,  0, 0, 0
-        def check(): return ActionType.CHECK.value, 0, 0, 0
+        def fold():  return record_and_return((ActionType.FOLD.value,  0, 0, 0))
+        def call():  return record_and_return((ActionType.CALL.value,  0, 0, 0))
+        def check(): return record_and_return((ActionType.CHECK.value, 0, 0, 0))
+        def do_discard(i, j):
+            return record_and_return((ActionType.DISCARD.value, 0, i, j))
         
         # =========================================================================
         # 第一步：必勝鎖定 (最高優先級！)
@@ -202,7 +211,8 @@ class V11(Agent):
         if self.is_guaranteed_win:
             # 強制換牌階段 (Street 1) 必須選兩張牌保留 [cite: 36, 449]
             if valid_actions[ActionType.DISCARD.value]:
-                return ActionType.DISCARD.value, 0, 0, 1
+                # return ActionType.DISCARD.value, 0, 0, 1
+                do_discard(0, 1)
             if valid_actions[ActionType.FOLD.value]:
                 return fold()
             return check()
@@ -211,7 +221,9 @@ class V11(Agent):
         # 第二步：加權預算池與動態算力分配 (Weighted Time Pool)
         # =========================================================================
         elapsed_time = time.perf_counter() - self.start_time
-        time_remaining = max(0.1, self.time_limit - elapsed_time)
+        # time_remaining = max(0.1, self.time_limit - elapsed_time)
+        # 🏆 修正：改用我們自己的專屬碼表來計算剩餘時間
+        time_remaining = max(0.1, self.time_limit - self.my_total_think_time)
 
         # 1. 設定我們「理想中」每手牌的耗時目標 (前期給極大寬容度，後期壓縮)
         early_cost_target = 0.85  # 前 400 手，每把允許吃 0.85 秒
@@ -260,7 +272,7 @@ class V11(Agent):
                 i, j = best_idx
             else:
                 i, j = 0, 1
-            return ActionType.DISCARD.value, 0, i, j
+            return do_discard(i, j)
         
         # =========================================================================
         # 第四步：常規下注與詐唬邏輯 (搭載蒙地卡羅分佈測量數據)

@@ -116,16 +116,11 @@ class PlayerAgent(Agent):
         # --- 新增：全域資源與狀態追蹤 ---
         self.start_time = time.perf_counter()
         # 設定安全時間閾值 (Phase 3 限制為 1500 秒，預留 50 秒作為緩衝)
-        self.start_time = time.perf_counter()
         self.time_limit = 450.0 
         self.total_hands = 1000
         self.net_chips = 0.0  # 追蹤我方累積淨收益
         self.is_guaranteed_win = False
-
-        # --- 新增：對手算力偵測器 ---
         self.my_total_think_time = 0.0
-        self.last_my_act_time = None
-        self.opp_is_tryhard_detected = False  # 只要他想超過 0.1 秒，就永久標記為算力狂
 
         self.dynamic_thresholds = {}
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -188,8 +183,6 @@ class PlayerAgent(Agent):
         def record_and_return(action_tuple):
             # 結算本次 act() 真正花費的時間，並存入總思考時間
             self.my_total_think_time += (time.perf_counter() - act_start_time)
-            # 記錄結束時間，留給下次進來時偷測對手時間用
-            self.last_my_act_time = time.perf_counter()
             return action_tuple
 
         def make_raise(fraction: float):
@@ -197,15 +190,9 @@ class PlayerAgent(Agent):
             amt = max(min_raise, min(max_raise, amt))
             return record_and_return((ActionType.RAISE.value, amt, 0, 0))
 
-        def fold():  
-            return record_and_return((ActionType.FOLD.value,  0, 0, 0))
-            
-        def call():  
-            return record_and_return((ActionType.CALL.value,  0, 0, 0))
-            
-        def check(): 
-            return record_and_return((ActionType.CHECK.value, 0, 0, 0))
-            
+        def fold():  return record_and_return((ActionType.FOLD.value,  0, 0, 0))
+        def call():  return record_and_return((ActionType.CALL.value,  0, 0, 0))
+        def check(): return record_and_return((ActionType.CHECK.value, 0, 0, 0))
         def do_discard(i, j):
             return record_and_return((ActionType.DISCARD.value, 0, i, j))
         
@@ -224,87 +211,63 @@ class PlayerAgent(Agent):
         if self.is_guaranteed_win:
             # 強制換牌階段 (Street 1) 必須選兩張牌保留 [cite: 36, 449]
             if valid_actions[ActionType.DISCARD.value]:
-                return do_discard(0, 1)  # 直接換前兩張，反正這把牌是要棄的
+                # return ActionType.DISCARD.value, 0, 0, 1
+                return do_discard(0, 1)
             if valid_actions[ActionType.FOLD.value]:
                 return fold()
             return check()
 
         # =========================================================================
-        # 1. 偷測對手時間 (Side-channel Timing) 與 算力狂偵測
+        # 第二步：加權預算池與動態算力分配 (Weighted Time Pool)
         # =========================================================================
-        current_time = time.perf_counter()
-        if self.last_my_act_time is not None:
-            opp_think_time = current_time - self.last_my_act_time
-            # 如果對手單次思考超過 0.1 秒，且不是系統剛啟動的極端延遲 (< 5.0s)
-            if 0.1 < opp_think_time < 5.0:
-                if not self.opp_is_tryhard_detected:
-                    self.logger.info(f"Find opponent think {opp_think_time:.3f}s, mark as tryhard!")
-                self.opp_is_tryhard_detected = True
-
-        is_early_game = current_hand <= 300
-
-        
-
-        # =========================================================================
-        # 2. 👑 時間放血戰術 (Time-Bleeding Auto-Fold)
-        # =========================================================================
-        # 既然確定對手是算力狂，我們【絕對不能在 Pre-flop 秒蓋】！
-        # 戰術：用最小的代價 (Call) 把對手拖進 Flop，逼他執行極度耗時的「換牌評估」，然後我們再 0 秒逃跑！
-        if is_early_game and self.opp_is_tryhard_detected:
-            # 遇到強制換牌階段 (Flop到了！對手剛剛已經燒了大量算力去算要換哪張)
-            if valid_actions[ActionType.DISCARD.value]:
-                return do_discard(0, 1) # 我們隨便換兩張，0秒完成
-            
-            if street == 0:
-                # Pre-flop: 盡量拖他進 Flop！能 Check 就 Check，代價小 (補齊盲注 1~2 籌碼) 就 Call
-                if can_check:
-                    return check()
-                if can_call and call_amount <= 2: 
-                    return call()
-                return fold() # 如果他加注太大，就不陪他玩了，蓋牌止損
-            else:
-                # Street 1, 2, 3: 任務完成 (對手已經把最耗時的運算做完了)，我們 0 秒棄牌！
-                if can_check:
-                    return check()
-                return fold()
-
-        # =========================================================================
-        # 3. 戰術型預算池與動態算力分配 (後期火力全開)
-        # =========================================================================
+        elapsed_time = time.perf_counter() - self.start_time
+        # time_remaining = max(0.1, self.time_limit - elapsed_time)
+        # 🏆 修正：改用我們自己的專屬碼表來計算剩餘時間
         time_remaining = max(0.1, self.time_limit - self.my_total_think_time)
 
-        if is_early_game:
-            early_cost_target = 0.40
-            late_cost_target  = 0.35
-            base_n_sim = {0: 100, 1: 150, 2: 150, 3: 200}.get(street, 100)
-            early_hands_left = 300 - current_hand + 1
-            late_hands_left  = self.total_hands - 300
-        else:
-            early_cost_target = 0.0
-            # 🛠️ 修正預算恐慌：將後期耗時目標下調到合理範圍 (0.35s)，解除 Bot 的赤字警報！
-            late_cost_target  = 0.35 
-            
-            if self.opp_is_tryhard_detected:
-                # 前 300 把我們都在 0 秒逃跑，現在時間多到滿出來！算力直接輾壓！
-                base_n_sim = {0: 200, 1: 250, 2: 300, 3: 400}.get(street, 250)
-            else:
-                base_n_sim = {0: 100, 1: 150, 2: 200, 3: 250}.get(street, 150)
-                
-            early_hands_left = 0
-            late_hands_left  = self.total_hands - current_hand + 1
+        # 1. 設定我們「理想中」每手牌的耗時目標 (前期給極大寬容度，後期壓縮)
+        early_cost_target = 0.85  # 前 400 手，每把允許吃 0.85 秒
+        late_cost_target = 0.15   # 後 600 手，每把只給 0.15 秒 (因為有很多局會直接 Fold，0.15 很夠)
 
+        # 2. 計算剩餘回合數 (嚴格區分前期與後期)
+        if current_hand <= 400:
+            early_hands_left = 400 - current_hand + 1
+            late_hands_left = self.total_hands - 400
+            
+            # 前期：較高的基礎模擬次數
+            base_n_sim = {0: 100, 1: 150, 2: 200, 3: 250}.get(street, 100)
+        else:
+            early_hands_left = 0
+            late_hands_left = self.total_hands - current_hand + 1
+            
+            # 中後期：保守的模擬次數
+            base_n_sim = {0: 50, 1: 100, 2: 150, 3: 200}.get(street, 50)
+
+        # 3. 結算：如果照這個奢侈的計畫打到最後，還需要多少秒？
         total_needed_budget = (early_hands_left * early_cost_target) + (late_hands_left * late_cost_target)
+
+        # 4. 算力倍率：我擁有的時間 / 我需要的時間
         sim_multiplier = time_remaining / max(1.0, total_needed_budget)
+
+        # 5. 安全鉗制與套用
+        if sim_multiplier < 0.9:
+            self.logger.warning(f"Time budget fall behind, reduce speed multiplier: {sim_multiplier:.2f}")
         
+        # 防止過度膨脹或過度壓縮 (最高 2.0 倍，最低 0.2 倍)
         sim_multiplier = max(0.2, min(2.0, sim_multiplier))
+
         n_sim = int(base_n_sim * sim_multiplier)
-        self.logger.info(f"Hand {current_hand} | n_sim: {n_sim} | Time left: {time_remaining:.1f}s")
+        n_sim = max(10, n_sim) # 底線防禦
+        # n_sim = int(round(n_sim / 10.0) * 10)
+        
+        self.logger.info(f"Hand {current_hand} | Street {street} | Time left: {time_remaining:.1f}s | multiplier: {sim_multiplier:.2f} | n_sim: {n_sim}")
 
         # =========================================================================
-        # 第三步：處理強制換牌
+        # 第三步：處理強制換牌 (現在可以吃到動態 n_sim 了)
         # =========================================================================
         if valid_actions[ActionType.DISCARD.value]:
             if len(my_cards) == 5:
+                # 這裡補上 n_sim，讓換牌決策也能根據剩餘時間縮放算力
                 best_idx, _ = choose_discard(my_cards, community, opp_discarded, my_discarded, n_sim=n_sim)
                 i, j = best_idx
             else:
@@ -312,11 +275,13 @@ class PlayerAgent(Agent):
             return do_discard(i, j)
         
         # =========================================================================
-        # 第四步：智能策略變形 (配合時間戰術改變打法)
+        # 第四步：常規下注與詐唬邏輯 (搭載蒙地卡羅分佈測量數據)
         # =========================================================================
+        # ── Safety check ──────────────────────────────────────────────
         if len(my_cards) < 2:
             return check() if can_check else fold()
             
+        # ── Estimate hand strength ─────────────────────────────────────
         if len(my_cards) == 5:
             _, strength = choose_discard(my_cards, community, opp_discarded, my_discarded, n_sim=n_sim)
         else:
@@ -326,33 +291,28 @@ class PlayerAgent(Agent):
         adj = strength - (0.05 if opp_aggressive else 0.0)
         pot_odds = call_amount / (pot + call_amount + 1e-9)
 
-        # 🏆 根據局勢切換不同的對抗策略
-        if is_early_game and self.opp_is_tryhard_detected:
-            # 🛡️【前期龜縮避戰】: 對手算力全開，我們絕不跟他拚邊緣機率，只玩最頂級的牌！讓他浪費時間算空氣。
-            if street == 0:
-                k_raise = "PR_90"  # 極嚴格
-                k_call  = "PR_70"
-                k_marg  = "PR_60"  # 不好直接蓋牌，讓他贏小盲注但虧時間
-            else:
-                k_raise = "PR_95"
-                k_call  = "PR_80"
-                k_marg  = "PR_70"
-        else:
-            # ⚔️【中後期收割 / 常規模式】: 我們有算力優勢，開始用 LAG 策略全面剝削！
-            if street == 0:
-                k_raise = "PR_70"  
-                k_call  = "PR_50"  # 狂看 Flop 尋找打擊點
-                k_marg  = "PR_60"  
-            elif street == 1 or street == 2:
-                k_raise = "PR_80" 
-                k_call  = "PR_60"  
-                k_marg  = "PR_50"
-            else: 
-                k_raise = "PR_80"  
-                k_call  = "PR_60"
-                k_marg  = "PR_50"
+        if street == 0:
+            # Pre-flop: 極度寬鬆！捍衛盲注，多看翻牌
+            k_raise = "PR_70"  # 前 30% 就主動加注，壓制對手
+            k_call  = "PR_50"  # 前 50% 都跟注 (甚至 PR_30 也可以)
+            k_marg  = "PR_50"  # 稍後用 offset 降到 PR_30
+        elif street == 1:
+            # Flop (換牌後): 牌力初步成型，開始過濾爛牌
+            k_raise = "PR_80" 
+            k_call  = "PR_60"  
+            k_marg  = "PR_50"
+        elif street == 2:
+            # Turn: 轉牌圈，牌力逐漸明朗，抓緊價值
+            k_raise = "PR_90"  
+            k_call  = "PR_60"
+            k_marg  = "PR_50"
+        else: 
+            # River: 對手圖窮匕見，拿前 20% (PR_80) 的牌狠狠榨取他們
+            k_raise = "PR_90"  
+            k_call  = "PR_60"
+            k_marg  = "PR_50"
             
-        k_nuts = "PR_95"
+        k_nuts = "PR_95" # 🏆 新增：用來懲罰瘋魚的極限堅果牌 Key
 
         # 1. 取得你目前載入的所有算力錨點並排序 (例如: [30, 100, 150, 200])
         anchor_levels = sorted(list(self.dynamic_thresholds.keys()))
