@@ -167,6 +167,7 @@ class PlayerAgent(Agent):
         # ### 新增：啟動時將 88 萬筆字典載入記憶體 ###
         global GLOBAL_LOOKUP_TABLE
         global GLOBAL_PREFLOP_TABLE
+        global GLOBAL_EHS_TABLE
         current_dir = os.path.dirname(os.path.abspath(__file__))
         try:
             with open(os.path.join(current_dir, "lookup_table_7cards.pkl"), "rb") as f:
@@ -184,9 +185,19 @@ class PlayerAgent(Agent):
             self.logger.error(f"讀取 Pre-flop 字典失敗: {e}")
         
         try:
-            with open(os.path.join(current_dir, "EHS_table_final.pkl"), "rb") as f:
+            with open(os.path.join(current_dir, "EHS_table_fixed.pkl"), "rb") as f:
                 GLOBAL_EHS_TABLE = pickle.load(f) 
-            self.logger.info("✅ 成功載入 EHS 有效牌力雷達！")
+            # --- 新增：格式抽樣驗證 ---
+            if GLOBAL_EHS_TABLE:
+                sample_key = next(iter(GLOBAL_EHS_TABLE))
+                # 驗證 Key 是否為 2 層 tuple，且包含底牌(2張)和公牌(3或4張)
+                if isinstance(sample_key, tuple) and len(sample_key) == 2 and len(sample_key[0]) == 2:
+                    self.logger.info(f"✅ EHS 雷達上線！格式驗證成功 (範例 Key: {sample_key})")
+                else:
+                    self.logger.error(f"❌ 警告：EHS 字典格式錯誤！預期 ((h1,h2), (c1,c2...))，實際拿到 {sample_key}")
+                    GLOBAL_EHS_TABLE = None # 強制停用錯誤的表
+            else:
+                 self.logger.warning("⚠️ EHS 字典是空的！")
         except Exception as e:
             self.logger.error(f"讀取 EHS 字典失敗: {e}")
 
@@ -277,14 +288,14 @@ class PlayerAgent(Agent):
                 preflop_equity = GLOBAL_PREFLOP_TABLE[tuple(sorted(my_cards))]
                 
                 # 基於勝率進行決策 (閾值可微調)
-                if preflop_equity > 0.60:
+                if preflop_equity > 0.55:
                     # 強牌：積極加注
                     if can_raise:
                         # 你可以寫成固定加注，或依據勝率動態加注
                         return make_raise(0.3) 
                     return call() if can_call else check()
                     
-                elif preflop_equity > 0.45:
+                elif preflop_equity > 0.38:
                     # 中等牌：跟注看翻牌
                     if call_amount > 20: # 對手下大注就跑
                         return fold()
@@ -296,7 +307,7 @@ class PlayerAgent(Agent):
                     # 爛牌：盡量不玩
                     if can_check:
                         return check() # 不用錢就看看
-                    if can_call and call_amount <= 2: # 盲注可以跟
+                    if can_call and call_amount <= 2:
                         return call()
                     return fold()
             else:
@@ -320,7 +331,8 @@ class PlayerAgent(Agent):
         # 根據不同的 Street 獲取情報
         if street in (1, 2) and GLOBAL_EHS_TABLE: 
             # Flop & Turn: 查 EHS 表 (Key 是你手牌加上公牌的排序 Tuple)
-            state_key = tuple(sorted(list(my_cards) + list(community)))
+            # state_key = tuple(sorted(list(my_cards) + list(community)))
+            state_key = (tuple(sorted(my_cards)), tuple(sorted(community)))
             if state_key in GLOBAL_EHS_TABLE:
                 HS, PPot, NPot = GLOBAL_EHS_TABLE[state_key]
             else:
@@ -339,10 +351,10 @@ class PlayerAgent(Agent):
         pot_odds = call_amount / (pot + call_amount + 1e-9)
 
         # 🛑 高方差防禦護盾
-        if call_amount > 40:
-            risk_premium = (call_amount / 100.0) * 0.15 
+        if call_amount > 25:
+            risk_premium = (call_amount / 100.0) * 0.20
             safe_call_threshold = pot_odds + risk_premium
-            safe_call_threshold = min(0.70, safe_call_threshold)
+            safe_call_threshold = min(0.75, safe_call_threshold)
             
             if adj < safe_call_threshold:
                 self.logger.info(f"Shield: No extreme bid, call amount: {call_amount}, ajd: {adj:.2f} < safty_threshold: {safe_call_threshold:.2f}")
@@ -352,7 +364,7 @@ class PlayerAgent(Agent):
         if adj > 0.75 or (HS > 0.70 and NPot > 0.25):
             if can_raise:
                 # 如果很容易被逆轉(NPot高)，就打重一點保護；如果很穩，就稍微釣魚
-                raise_frac = 0.7 if NPot > 0.25 else min(1.0, 0.5 + (adj - 0.75) * 2.0)
+                raise_frac = 0.35 if NPot > 0.25 else min(1.0, 0.5 + (adj - 0.75) * 2.0)
                 return make_raise(raise_frac)
             if can_call:  return call()
             return check()
@@ -362,9 +374,12 @@ class PlayerAgent(Agent):
             if can_raise:
                 # 半詐唬 (Semi-bluff)：牌不好但潛力高，加注施壓
                 if HS < 0.50 and PPot > 0.35:
-                    # 有時候只 call，有時候激進 raise (隨機性防止被抓)
-                    if random.random() < 0.4:
-                        return make_raise(0.15)
+                    # 大幅提升發動機率到 75%，並把注碼提高到 0.35 給予對手實質壓力
+                    if random.random() < 0.75:
+                        return make_raise(0.35)
+                    # 如果這次隨機決定不加注，也要強迫它 Call 住看下一張神牌，不准 Fold！
+                    elif can_call and call_amount <= max(10, int(pot * 0.5)):
+                        return call()
                 # 正常中上牌力加注
                 elif adj > 0.68:
                     return make_raise(0.25)
@@ -383,30 +398,30 @@ class PlayerAgent(Agent):
             return fold()
         
         # 4. 垃圾牌：詐唬邏輯 (保留你原本精妙的動態詐唬)
-        # base_raise_bluff = 0.05  
-        # base_call_bluff  = 0.05  
+        base_raise_bluff = 0.05
+        base_call_bluff  = 0.05
         
-        # if call_amount == 0 or call_amount <= max(2, int(pot * 0.1)):
-        #     base_raise_bluff += 0.12  
-        # elif call_amount > int(pot * 0.5):
-        #     base_raise_bluff = 0.0    
-        #     base_call_bluff  = 0.0
+        if call_amount == 0 or call_amount <= max(2, int(pot * 0.1)):
+            base_raise_bluff += 0.08  
+        elif call_amount > int(pot * 0.4):
+            base_raise_bluff = 0.0    
+            base_call_bluff  = 0.0
             
-        # if street == 3: 
-        #     base_raise_bluff *= 0.2
-        #     base_call_bluff  *= 0.2
+        if street == 3: 
+            base_raise_bluff *= 0.1
+            base_call_bluff  *= 0.1
             
-        # jitter = random.uniform(-0.01, 0.01)
-        # final_raise_bluff = max(0.0, base_raise_bluff + jitter)
-        # final_call_bluff  = max(0.0, base_call_bluff + jitter)
+        jitter = random.uniform(-0.01, 0.01)
+        final_raise_bluff = max(0.0, base_raise_bluff + jitter)
+        final_call_bluff  = max(0.0, base_call_bluff + jitter)
         
-        # bluff_roll = random.random()
+        bluff_roll = random.random()
         
-        # if bluff_roll < final_raise_bluff and can_raise:
-        #     return make_raise(random.uniform(0.25, 0.45))
+        if bluff_roll < final_raise_bluff and can_raise:
+            return make_raise(random.uniform(0.25, 0.45))
             
-        # elif bluff_roll < (final_raise_bluff + final_call_bluff) and can_call and call_amount <= max(4, int(pot * 0.3)):
-        #     return call()
+        elif bluff_roll < (final_raise_bluff + final_call_bluff) and can_call and call_amount <= max(4, int(pot * 0.3)):
+            return call()
             
         if can_check: return check()
         return fold()
