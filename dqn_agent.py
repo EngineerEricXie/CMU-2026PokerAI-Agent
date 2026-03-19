@@ -153,18 +153,12 @@ class PlayerAgent(Agent):
         try:
             with open(os.path.join(current_dir, "lookup_table_7cards.pkl"), "rb") as f:
                 GLOBAL_LOOKUP_TABLE = pickle.load(f) 
-                self.logger.info(f"✅ 成功載入 lookup_table_7cards.pkl，包含 {len(GLOBAL_LOOKUP_TABLE)} 項")
-        except: 
-            self.logger.info("⚠️ 無法載入 lookup_table_7cards.pkl，將無法使用查表功能。")
-            pass
+        except: pass
         
         try:
             with open(os.path.join(current_dir, "preflop_table.pkl"), "rb") as f:
                 GLOBAL_PREFLOP_TABLE = pickle.load(f) 
-                self.logger.info(f"✅ 成功載入 preflop_table.pkl，包含 {len(GLOBAL_PREFLOP_TABLE)} 項")
-        except: 
-            self.logger.info("⚠️ 無法載入 preflop_table.pkl，將無法使用查表功能。")
-            pass
+        except: pass
 
         # --- DQN 初始化 ---
         self.is_training = is_training
@@ -180,7 +174,7 @@ class PlayerAgent(Agent):
         
         if not self.start_from_new:
             if self.load_model_path is None:
-                model_path = os.path.join(current_dir, "../models", "dqn_poker_final.pth")
+                model_path = os.path.join(current_dir, "models", "dqn_poker_final.pth")
             else:
                 model_path = self.load_model_path
             self.load_model(model_path)
