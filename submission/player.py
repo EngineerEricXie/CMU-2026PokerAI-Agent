@@ -1,3 +1,4 @@
+import json
 import random
 import itertools
 from collections import Counter
@@ -149,12 +150,14 @@ def exhaustive_choose_discard(hole: list, community: list, opp_discarded: list) 
             
     return best_idx
 
+
 # ---------------------------------------------------------------------------
 # Player Agent
 # ---------------------------------------------------------------------------
 class PlayerAgent(Agent):
 
     def __init__(self, stream: bool = True):
+        
         super().__init__(stream)
         self.action_types = ActionType
         self.start_time = time.perf_counter()
@@ -163,12 +166,20 @@ class PlayerAgent(Agent):
         self.net_chips = 0.0  
         self.is_guaranteed_win = False
         self.my_total_think_time = 0.0
+        self.cfr_strategy = {}
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        try:
+            with open(os.path.join(current_dir, "cfr_strategy.json"), "r") as f:
+                self.cfr_strategy = json.load(f)
+            self.logger.info(f"✅ 成功载入 CFR 完美策略表！包含 {len(self.cfr_strategy)} 个决策节点。")
+        except Exception as e:
+            self.logger.error(f"读取 CFR 策略表失败: {e}")
         
         # ### 新增：啟動時將 88 萬筆字典載入記憶體 ###
         global GLOBAL_LOOKUP_TABLE
         global GLOBAL_PREFLOP_TABLE
         global GLOBAL_EHS_TABLE
-        current_dir = os.path.dirname(os.path.abspath(__file__))
+       
         try:
             with open(os.path.join(current_dir, "lookup_table_7cards.pkl"), "rb") as f:
                 GLOBAL_LOOKUP_TABLE = pickle.load(f) 
@@ -203,6 +214,33 @@ class PlayerAgent(Agent):
 
     def __name__(self):
         return "PlayerAgent"
+    
+    # ---------------------------------------------------------------------------
+# 将复杂的牌局状态压缩成离散的信息集 ID (Infoset Key)
+# ---------------------------------------------------------------------------
+    def get_infoset_key(self, street: int, ehs_val: float, call_amount: int, pot_size: int) -> str:
+        """
+        将当前复杂的牌局状态，压缩成一个离散的字符串（信息集 ID）。
+        CFR 将针对这些 ID 学习最优的 Fold/Call/Raise 概率分布。
+        """
+        # 1. 牌力分桶 (Hand Strength Bucket)
+        # 基于原代码的 adj 阈值进行了平滑切分
+        if ehs_val >= 0.75: hs_bucket = "Nuts" # 绝对强牌 (原代码 adj > 0.75)
+        elif ehs_val >= 0.60: hs_bucket = "Strong" # 强牌/高潜听牌 (原代码 adj > 0.60)
+        elif ehs_val >= 0.40: hs_bucket = "Marginal" # 边缘牌 (原代码 adj > 0.42)
+        else: hs_bucket = "Trash" # 垃圾牌
+
+        # 2. 下注压力/底池赔率分桶 (Betting Pressure Bucket)
+        # 衡量我们要跟注的代价有多大
+        if call_amount == 0: pressure = "None" # 可以免费 Check
+        else:
+            # 计算底池赔率
+            pot_odds = call_amount / (pot_size + call_amount + 1e-9)
+            if pot_odds < 0.20: pressure = "Low" # 便宜，随时可跟注
+            elif pot_odds < 0.35: pressure = "Med" # 正常加注压力
+            else: pressure = "High" # 对方下了重注，面临极高方差风险 (原代码 call_amount > 25 的防卫盾)
+
+        return f"S{street}_{hs_bucket}_{pressure}"
 
     def act(self, observation, reward, terminated, truncated, info):
         act_start_time = time.perf_counter()
@@ -318,112 +356,60 @@ class PlayerAgent(Agent):
                 return fold()
             
         # =========================================================================
-        # 第五步：Post-flop (Street 1~3) 絕對勝率精算與下注邏輯
+        # 第五步：Post-flop (Street 1~3) CFR 查表极速决策
         # =========================================================================
-        # 走到這裡，保證手上只有 2 張底牌，直接啟動我們完美的 O(1) 字典窮舉引擎！
-        # strength = get_exact_strength(my_cards, community, opp_discarded, my_discarded)
-        global GLOBAL_EHS_TABLE
         
-        HS = 0.5
-        PPot = 0.0
-        NPot = 0.0
-        
-        # 根據不同的 Street 獲取情報
+        # 1. 获取准确的 EHS (这部分保留你原本写得很好的代码)
         if street in (1, 2) and GLOBAL_EHS_TABLE: 
-            # Flop & Turn: 查 EHS 表 (Key 是你手牌加上公牌的排序 Tuple)
-            # state_key = tuple(sorted(list(my_cards) + list(community)))
             state_key = (tuple(sorted(my_cards)), tuple(sorted(community)))
             if state_key in GLOBAL_EHS_TABLE:
                 HS, PPot, NPot = GLOBAL_EHS_TABLE[state_key]
             else:
                 HS = get_exact_strength(my_cards, community, opp_discarded, my_discarded)
         else:
-            # River (Street 3) 或字典沒載入：直接查絕對勝率 (沒有潛力了)
             HS = get_exact_strength(my_cards, community, opp_discarded, my_discarded)
-            
-        # 計算 EHS (有效牌力)
+            PPot, NPot = 0.0, 0.0
+
         ehs_val = HS + (1 - HS) * PPot - HS * NPot
+        
+        # 2. 获取当前状态的 Bucket ID
+        infoset = self.get_infoset_key(street, ehs_val, call_amount, pot)
+        
+        # 3. 查表获取策略概率 (如果遇到意料之外的状态，默认稳健策略：遇加注则弃牌，否则过牌)
+        strategy = self.cfr_strategy.get(infoset, {"FOLD": 0.8, "CALL": 0.2, "RAISE": 0.0} if call_amount > 0 else {"FOLD": 0.0, "CALL": 1.0, "RAISE": 0.0})
+        
+        # 4. 根据概率随机抽取动作 (核心：混合策略)
+        actions = list(strategy.keys())
+        probs = list(strategy.values())
+        import numpy as np
+        probs_array = np.array(probs)
+        probs_array = probs_array / probs_array.sum()
+        chosen_action = np.random.choice(actions, p=probs_array)
+        
+        self.logger.info(f"CFR Node: {infoset} | Strategy: {strategy} | Executing: {chosen_action}")
 
-        # (後續下注邏輯保持不變)
-        opp_aggressive = (opp_bet > my_bet and opp_bet > 30)
-        adj = ehs_val - (0.05 if opp_aggressive else 0.0)
-
-        pot_odds = call_amount / (pot + call_amount + 1e-9)
-
-        # 🛑 高方差防禦護盾
-        if call_amount > 25:
-            risk_premium = (call_amount / 100.0) * 0.20
-            safe_call_threshold = pot_odds + risk_premium
-            safe_call_threshold = min(0.75, safe_call_threshold)
+        # 5. 执行动作转换 (结合引擎规则)
+        if chosen_action == "RAISE" and can_raise:
+            # AI 决定加注！使用默认的半池或随机注码，只要不超出比赛上限即可
+            raise_frac = random.uniform(0.3, 0.6) 
+            return make_raise(raise_frac)
             
-            if adj < safe_call_threshold:
-                self.logger.info(f"Shield: No extreme bid, call amount: {call_amount}, ajd: {adj:.2f} < safty_threshold: {safe_call_threshold:.2f}")
-                return check() if can_check else fold()
-
-        # 1. 超強牌，或是很強但脆弱的牌 (Vulnerable Lead)
-        if adj > 0.75 or (HS > 0.70 and NPot > 0.25):
-            if can_raise:
-                # 如果很容易被逆轉(NPot高)，就打重一點保護；如果很穩，就稍微釣魚
-                raise_frac = 0.35 if NPot > 0.25 else min(1.0, 0.5 + (adj - 0.75) * 2.0)
-                return make_raise(raise_frac)
-            if can_call:  return call()
-            return check()
-
-        # 2. 中上牌力，或是極具潛力的聽牌 (Semi-Bluff)
-        if adj > 0.60 or (HS < 0.50 and PPot > 0.35):
-            if can_raise:
-                # 半詐唬 (Semi-bluff)：牌不好但潛力高，加注施壓
-                if HS < 0.50 and PPot > 0.35:
-                    # 大幅提升發動機率到 75%，並把注碼提高到 0.35 給予對手實質壓力
-                    if random.random() < 0.75:
-                        return make_raise(0.35)
-                    # 如果這次隨機決定不加注，也要強迫它 Call 住看下一張神牌，不准 Fold！
-                    elif can_call and call_amount <= max(10, int(pot * 0.5)):
-                        return call()
-                # 正常中上牌力加注
-                elif adj > 0.68:
-                    return make_raise(0.25)
-                    
-            if can_call and adj > pot_odds + 0.05:
+        elif chosen_action == "CALL":
+            # 在没有下注压力时，CALL 实际上就是 CHECK
+            if call_amount == 0 and can_check:
+                return check()
+            if can_call:
                 return call()
-            if can_check: return check()
-            if can_call:  return call()
+                
+        elif chosen_action == "FOLD":
+            # 免费过牌时绝对不弃牌，这是最低级的失误
+            if call_amount == 0 and can_check:
+                return check()
             return fold()
-
-        # 3. 邊緣牌力
-        if adj > 0.42:
-            if can_check: return check()
-            if can_call and call_amount <= max(2, int(pot * 0.25)):
-                return call()
-            return fold()
-        
-        # 4. 垃圾牌：詐唬邏輯 (保留你原本精妙的動態詐唬)
-        base_raise_bluff = 0.05
-        base_call_bluff  = 0.05
-        
-        if call_amount == 0 or call_amount <= max(2, int(pot * 0.1)):
-            base_raise_bluff += 0.08  
-        elif call_amount > int(pot * 0.4):
-            base_raise_bluff = 0.0    
-            base_call_bluff  = 0.0
             
-        if street == 3: 
-            base_raise_bluff *= 0.1
-            base_call_bluff  *= 0.1
-            
-        jitter = random.uniform(-0.01, 0.01)
-        final_raise_bluff = max(0.0, base_raise_bluff + jitter)
-        final_call_bluff  = max(0.0, base_call_bluff + jitter)
-        
-        bluff_roll = random.random()
-        
-        if bluff_roll < final_raise_bluff and can_raise:
-            return make_raise(random.uniform(0.25, 0.45))
-            
-        elif bluff_roll < (final_raise_bluff + final_call_bluff) and can_call and call_amount <= max(4, int(pot * 0.3)):
-            return call()
-            
+        # 绝对兜底逻辑，防止因为无效动作被判负
         if can_check: return check()
+        if can_call and call_amount <= max(2, int(pot * 0.15)): return call()
         return fold()
 
     def observe(self, observation, reward, terminated, truncated, info):

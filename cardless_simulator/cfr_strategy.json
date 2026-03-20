@@ -1,0 +1,222 @@
+{
+    "S1_Marginal_High": {
+        "CALL": 0.0,
+        "FOLD": 1.0,
+        "RAISE": 0.0
+    },
+    "S1_Marginal_Low": {
+        "CALL": 0.654,
+        "FOLD": 0.011,
+        "RAISE": 0.336
+    },
+    "S1_Marginal_Med": {
+        "CALL": 0.0,
+        "FOLD": 1.0,
+        "RAISE": 0.0
+    },
+    "S1_Nuts_High": {
+        "CALL": 0.0,
+        "FOLD": 0.0,
+        "RAISE": 1.0
+    },
+    "S1_Nuts_Low": {
+        "CALL": 0.211,
+        "FOLD": 0.0,
+        "RAISE": 0.789
+    },
+    "S1_Nuts_Med": {
+        "CALL": 0.658,
+        "FOLD": 0.0,
+        "RAISE": 0.342
+    },
+    "S1_Strong_High": {
+        "CALL": 0.0,
+        "FOLD": 1.0,
+        "RAISE": 0.0
+    },
+    "S1_Strong_Low": {
+        "CALL": 0.745,
+        "FOLD": 0.051,
+        "RAISE": 0.204
+    },
+    "S1_Strong_Med": {
+        "CALL": 0.001,
+        "FOLD": 0.999,
+        "RAISE": 0.0
+    },
+    "S1_Trash_High": {
+        "CALL": 0.0,
+        "FOLD": 1.0,
+        "RAISE": 0.0
+    },
+    "S1_Trash_Low": {
+        "CALL": 0.224,
+        "FOLD": 0.031,
+        "RAISE": 0.746
+    },
+    "S1_Trash_Med": {
+        "CALL": 0.0,
+        "FOLD": 1.0,
+        "RAISE": 0.0
+    },
+    "S2_Marginal_High": {
+        "CALL": 0.0,
+        "FOLD": 1.0,
+        "RAISE": 0.0
+    },
+    "S2_Marginal_Low": {
+        "CALL": 0.678,
+        "FOLD": 0.066,
+        "RAISE": 0.256
+    },
+    "S2_Marginal_Med": {
+        "CALL": 0.286,
+        "FOLD": 0.286,
+        "RAISE": 0.429
+    },
+    "S2_Marginal_None": {
+        "CALL": 0.696,
+        "FOLD": 0.25,
+        "RAISE": 0.054
+    },
+    "S2_Nuts_High": {
+        "CALL": 0.403,
+        "FOLD": 0.005,
+        "RAISE": 0.592
+    },
+    "S2_Nuts_Low": {
+        "CALL": 0.122,
+        "FOLD": 0.0,
+        "RAISE": 0.878
+    },
+    "S2_Nuts_Med": {
+        "CALL": 0.969,
+        "FOLD": 0.0,
+        "RAISE": 0.031
+    },
+    "S2_Nuts_None": {
+        "CALL": 0.793,
+        "FOLD": 0.0,
+        "RAISE": 0.207
+    },
+    "S2_Strong_High": {
+        "CALL": 0.0,
+        "FOLD": 1.0,
+        "RAISE": 0.0
+    },
+    "S2_Strong_Low": {
+        "CALL": 0.748,
+        "FOLD": 0.015,
+        "RAISE": 0.236
+    },
+    "S2_Strong_Med": {
+        "CALL": 0.25,
+        "FOLD": 0.5,
+        "RAISE": 0.25
+    },
+    "S2_Strong_None": {
+        "CALL": 0.999,
+        "FOLD": 0.0,
+        "RAISE": 0.0
+    },
+    "S2_Trash_High": {
+        "CALL": 0.0,
+        "FOLD": 1.0,
+        "RAISE": 0.0
+    },
+    "S2_Trash_Low": {
+        "CALL": 0.495,
+        "FOLD": 0.035,
+        "RAISE": 0.47
+    },
+    "S2_Trash_Med": {
+        "CALL": 0.287,
+        "FOLD": 0.205,
+        "RAISE": 0.508
+    },
+    "S2_Trash_None": {
+        "CALL": 0.951,
+        "FOLD": 0.017,
+        "RAISE": 0.032
+    },
+    "S3_Marginal_High": {
+        "CALL": 0.0,
+        "FOLD": 1.0,
+        "RAISE": 0.0
+    },
+    "S3_Marginal_Low": {
+        "CALL": 0.045,
+        "FOLD": 0.807,
+        "RAISE": 0.147
+    },
+    "S3_Marginal_Med": {
+        "CALL": 0.014,
+        "FOLD": 0.96,
+        "RAISE": 0.025
+    },
+    "S3_Marginal_None": {
+        "CALL": 0.824,
+        "FOLD": 0.153,
+        "RAISE": 0.022
+    },
+    "S3_Nuts_High": {
+        "CALL": 0.1,
+        "FOLD": 0.0,
+        "RAISE": 0.9
+    },
+    "S3_Nuts_Low": {
+        "CALL": 0.951,
+        "FOLD": 0.0,
+        "RAISE": 0.049
+    },
+    "S3_Nuts_Med": {
+        "CALL": 0.334,
+        "FOLD": 0.0,
+        "RAISE": 0.666
+    },
+    "S3_Nuts_None": {
+        "CALL": 0.783,
+        "FOLD": 0.0,
+        "RAISE": 0.217
+    },
+    "S3_Strong_High": {
+        "CALL": 0.0,
+        "FOLD": 1.0,
+        "RAISE": 0.0
+    },
+    "S3_Strong_Low": {
+        "CALL": 0.579,
+        "FOLD": 0.413,
+        "RAISE": 0.008
+    },
+    "S3_Strong_Med": {
+        "CALL": 0.77,
+        "FOLD": 0.143,
+        "RAISE": 0.087
+    },
+    "S3_Strong_None": {
+        "CALL": 0.985,
+        "FOLD": 0.001,
+        "RAISE": 0.014
+    },
+    "S3_Trash_High": {
+        "CALL": 0.0,
+        "FOLD": 1.0,
+        "RAISE": 0.0
+    },
+    "S3_Trash_Low": {
+        "CALL": 0.884,
+        "FOLD": 0.025,
+        "RAISE": 0.091
+    },
+    "S3_Trash_Med": {
+        "CALL": 0.495,
+        "FOLD": 0.161,
+        "RAISE": 0.344
+    },
+    "S3_Trash_None": {
+        "CALL": 0.739,
+        "FOLD": 0.01,
+        "RAISE": 0.251
+    }
+}
