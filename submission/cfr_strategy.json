@@ -1,0 +1,518 @@
+{
+    "P0_S0_Marginal_Med": {
+        "FOLD": 1.0,
+        "CALL": 0.0,
+        "RAISE": 0.0
+    },
+    "P1_S0_Marginal_None": {
+        "FOLD": 0.212,
+        "CHECK": 0.788,
+        "RAISE": 0.0
+    },
+    "P1_S1_Marginal_None": {
+        "FOLD": 1.0,
+        "CHECK": 0.0,
+        "RAISE": 0.0
+    },
+    "P0_S1_Trash_None": {
+        "FOLD": 0.885,
+        "CHECK": 0.058,
+        "RAISE": 0.058
+    },
+    "P1_S2_Strong_None": {
+        "FOLD": 1.0,
+        "CHECK": 0.0,
+        "RAISE": 0.0
+    },
+    "P0_S2_Trash_None": {
+        "FOLD": 0.899,
+        "CHECK": 0.082,
+        "RAISE": 0.019
+    },
+    "P1_S3_Strong_None": {
+        "FOLD": 0.671,
+        "CHECK": 0.193,
+        "RAISE": 0.136
+    },
+    "P0_S3_Trash_None": {
+        "FOLD": 0.975,
+        "CHECK": 0.012,
+        "RAISE": 0.012
+    },
+    "P1_S3_Strong_High": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P0_S3_Trash_Med": {
+        "FOLD": 0.348,
+        "CALL": 0.348,
+        "RAISE": 0.303
+    },
+    "P0_S3_Trash_High": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P1_S3_Strong_Med": {
+        "FOLD": 0.647,
+        "CALL": 0.353
+    },
+    "P1_S2_Strong_High": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P1_S3_Nuts_None": {
+        "FOLD": 0.953,
+        "CHECK": 0.023,
+        "RAISE": 0.023
+    },
+    "P0_S3_Marginal_None": {
+        "FOLD": 0.493,
+        "CHECK": 0.493,
+        "RAISE": 0.015
+    },
+    "P1_S3_Nuts_Med": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P0_S3_Marginal_Low": {
+        "FOLD": 0.991,
+        "CALL": 0.009
+    },
+    "P0_S3_Marginal_Med": {
+        "FOLD": 0.802,
+        "CALL": 0.099,
+        "RAISE": 0.099
+    },
+    "P1_S3_Nuts_Low": {
+        "FOLD": 0.5,
+        "CALL": 0.5
+    },
+    "P0_S2_Trash_Med": {
+        "FOLD": 0.971,
+        "CALL": 0.029
+    },
+    "P1_S3_Marginal_None": {
+        "FOLD": 0.927,
+        "CHECK": 0.037,
+        "RAISE": 0.037
+    },
+    "P1_S3_Marginal_Low": {
+        "FOLD": 0.417,
+        "CALL": 0.417,
+        "RAISE": 0.167
+    },
+    "P0_S3_Trash_Low": {
+        "FOLD": 1.0
+    },
+    "P0_S2_Trash_High": {
+        "FOLD": 0.541,
+        "CALL": 0.292,
+        "RAISE": 0.167
+    },
+    "P1_S3_Trash_None": {
+        "FOLD": 0.779,
+        "CHECK": 0.11,
+        "RAISE": 0.11
+    },
+    "P0_S3_Strong_None": {
+        "FOLD": 0.494,
+        "CHECK": 0.494,
+        "RAISE": 0.013
+    },
+    "P1_S3_Trash_Med": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P0_S3_Strong_Low": {
+        "FOLD": 0.99,
+        "CALL": 0.01
+    },
+    "P0_S3_Strong_Med": {
+        "FOLD": 0.48,
+        "CALL": 0.48,
+        "RAISE": 0.041
+    },
+    "P1_S3_Trash_Low": {
+        "FOLD": 0.5,
+        "CALL": 0.5
+    },
+    "P1_S2_Strong_Med": {
+        "FOLD": 0.5,
+        "CALL": 0.5
+    },
+    "P1_S1_Marginal_High": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P1_S2_Trash_None": {
+        "FOLD": 1.0,
+        "CHECK": 0.0,
+        "RAISE": 0.0
+    },
+    "P0_S3_Nuts_None": {
+        "FOLD": 0.448,
+        "CHECK": 0.448,
+        "RAISE": 0.104
+    },
+    "P0_S3_Nuts_Low": {
+        "FOLD": 0.388,
+        "CALL": 0.388,
+        "RAISE": 0.225
+    },
+    "P0_S3_Nuts_Med": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P1_S3_Strong_Low": {
+        "CHECK": 1.0,
+        "CALL": 1.0
+    },
+    "P1_S2_Trash_Med": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P0_S2_Trash_Low": {
+        "FOLD": 1.0
+    },
+    "P1_S2_Trash_Low": {
+        "FOLD": 0.411,
+        "CALL": 0.411,
+        "RAISE": 0.178
+    },
+    "P0_S1_Trash_Med": {
+        "FOLD": 0.892,
+        "CALL": 0.108
+    },
+    "P0_S1_Trash_High": {
+        "FOLD": 0.503,
+        "CALL": 0.366,
+        "RAISE": 0.131
+    },
+    "P1_S2_Marginal_None": {
+        "FOLD": 1.0,
+        "CHECK": 0.0,
+        "RAISE": 0.0
+    },
+    "P1_S2_Marginal_Med": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P1_S2_Marginal_Low": {
+        "FOLD": 0.5,
+        "CALL": 0.5
+    },
+    "P1_S1_Marginal_Med": {
+        "FOLD": 0.5,
+        "CALL": 0.5
+    },
+    "P0_S2_Nuts_None": {
+        "FOLD": 0.832,
+        "CHECK": 0.084,
+        "RAISE": 0.084
+    },
+    "P1_S2_Strong_Low": {
+        "FOLD": 0.5,
+        "CALL": 0.5
+    },
+    "P0_S2_Nuts_Low": {
+        "FOLD": 0.749,
+        "CALL": 0.151,
+        "RAISE": 0.1
+    },
+    "P0_S0_Marginal_High": {
+        "FOLD": 0.891,
+        "CALL": 0.055,
+        "RAISE": 0.055
+    },
+    "P0_S1_Strong_None": {
+        "FOLD": 0.333,
+        "CHECK": 0.333,
+        "RAISE": 0.333
+    },
+    "P0_S2_Strong_None": {
+        "FOLD": 0.333,
+        "CHECK": 0.333,
+        "RAISE": 0.333
+    },
+    "P1_S3_Marginal_Med": {
+        "CHECK": 1.0,
+        "CALL": 1.0
+    },
+    "P0_S2_Strong_Low": {
+        "FOLD": 0.414,
+        "CALL": 0.414,
+        "RAISE": 0.172
+    },
+    "P0_S2_Strong_Med": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P0_S1_Strong_Low": {
+        "FOLD": 0.464,
+        "CALL": 0.464,
+        "RAISE": 0.072
+    },
+    "P0_S1_Strong_Med": {
+        "FOLD": 0.374,
+        "CALL": 0.374,
+        "RAISE": 0.251
+    },
+    "P1_S1_Marginal_Low": {
+        "CHECK": 1.0,
+        "CALL": 1.0
+    },
+    "P1_S0_Marginal_Med": {
+        "FOLD": 0.952,
+        "CALL": 0.048
+    },
+    "P1_S1_Strong_None": {
+        "FOLD": 1.0,
+        "CHECK": 0.0,
+        "RAISE": 0.0
+    },
+    "P0_S1_Marginal_None": {
+        "FOLD": 0.966,
+        "CHECK": 0.017,
+        "RAISE": 0.017
+    },
+    "P1_S1_Strong_Low": {
+        "FOLD": 0.417,
+        "CALL": 0.417,
+        "RAISE": 0.167
+    },
+    "P0_S1_Marginal_Low": {
+        "FOLD": 0.941,
+        "CALL": 0.059
+    },
+    "P0_S2_Marginal_None": {
+        "FOLD": 0.333,
+        "CHECK": 0.333,
+        "RAISE": 0.333
+    },
+    "P0_S2_Marginal_Low": {
+        "FOLD": 0.412,
+        "CALL": 0.412,
+        "RAISE": 0.176
+    },
+    "P1_S0_Marginal_High": {
+        "FOLD": 1.0,
+        "CALL": 0.0,
+        "RAISE": 0.0
+    },
+    "P0_S2_Marginal_Med": {
+        "FOLD": 0.355,
+        "CALL": 0.355,
+        "RAISE": 0.29
+    },
+    "P1_S1_Strong_Med": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P0_S1_Trash_Low": {
+        "FOLD": 1.0
+    },
+    "P1_S2_Nuts_None": {
+        "FOLD": 1.0,
+        "CHECK": 0.0,
+        "RAISE": 0.0
+    },
+    "P1_S2_Nuts_Low": {
+        "FOLD": 0.417,
+        "CALL": 0.417,
+        "RAISE": 0.167
+    },
+    "P0_S0_Strong_Med": {
+        "FOLD": 1.0,
+        "CALL": 0.0,
+        "RAISE": 0.0
+    },
+    "P1_S2_Nuts_High": {
+        "CHECK": 1.0,
+        "CALL": 1.0
+    },
+    "P1_S2_Nuts_Med": {
+        "CHECK": 1.0,
+        "CALL": 1.0
+    },
+    "P1_S1_Strong_High": {
+        "CHECK": 1.0,
+        "CALL": 1.0
+    },
+    "P0_S2_Nuts_Med": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P0_S1_Marginal_Med": {
+        "FOLD": 0.835,
+        "CALL": 0.083,
+        "RAISE": 0.083
+    },
+    "P0_S1_Marginal_High": {
+        "FOLD": 0.581,
+        "CALL": 0.209,
+        "RAISE": 0.209
+    },
+    "P0_S0_Strong_High": {
+        "FOLD": 0.42,
+        "CALL": 0.294,
+        "RAISE": 0.285
+    },
+    "P1_S1_Trash_None": {
+        "FOLD": 0.0,
+        "CHECK": 0.0,
+        "RAISE": 1.0
+    },
+    "P1_S1_Trash_Med": {
+        "FOLD": 0.5,
+        "CALL": 0.5,
+        "RAISE": 0.0
+    },
+    "P1_S1_Trash_Low": {
+        "FOLD": 0.5,
+        "CALL": 0.5
+    },
+    "P1_S2_Marginal_High": {
+        "CHECK": 1.0,
+        "CALL": 1.0
+    },
+    "P0_S2_Marginal_High": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P0_S1_Strong_High": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P1_S3_Marginal_High": {
+        "CHECK": 1.0,
+        "CALL": 1.0
+    },
+    "P0_S3_Marginal_High": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P1_S1_Trash_High": {
+        "CHECK": 1.0,
+        "CALL": 1.0
+    },
+    "P1_S1_Nuts_None": {
+        "FOLD": 0.333,
+        "CHECK": 0.333,
+        "RAISE": 0.333
+    },
+    "P1_S1_Nuts_Low": {
+        "FOLD": 0.451,
+        "CALL": 0.451,
+        "RAISE": 0.098
+    },
+    "P1_S3_Nuts_High": {
+        "CHECK": 1.0,
+        "CALL": 1.0
+    },
+    "P0_S3_Strong_High": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P1_S2_Trash_High": {
+        "CHECK": 1.0,
+        "CALL": 1.0
+    },
+    "P1_S0_Trash_None": {
+        "FOLD": 0.5,
+        "CHECK": 0.5,
+        "RAISE": 0.0
+    },
+    "P1_S3_Trash_High": {
+        "CHECK": 1.0,
+        "CALL": 1.0
+    },
+    "P0_S3_Nuts_High": {
+        "CHECK": 1.0,
+        "CALL": 1.0
+    },
+    "P1_S0_Trash_Med": {
+        "FOLD": 0.5,
+        "CALL": 0.5
+    },
+    "P1_S0_Trash_High": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P1_S0_Strong_None": {
+        "FOLD": 0.191,
+        "CHECK": 0.191,
+        "RAISE": 0.617
+    },
+    "P1_S0_Strong_Med": {
+        "FOLD": 0.5,
+        "CALL": 0.5
+    },
+    "P0_S1_Nuts_None": {
+        "FOLD": 0.333,
+        "CHECK": 0.333,
+        "RAISE": 0.333
+    },
+    "P0_S1_Nuts_Low": {
+        "CHECK": 1.0,
+        "CALL": 1.0
+    },
+    "P1_S0_Strong_High": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P1_S1_Nuts_Med": {
+        "FOLD": 0.451,
+        "CALL": 0.451,
+        "RAISE": 0.098
+    },
+    "P0_S0_Trash_Med": {
+        "FOLD": 1.0,
+        "CALL": 0.0,
+        "RAISE": 0.0
+    },
+    "P0_S1_Nuts_Med": {
+        "FOLD": 0.5,
+        "CALL": 0.5
+    },
+    "P0_S1_Nuts_High": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P0_S0_Trash_High": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    },
+    "P0_S2_Strong_High": {
+        "CHECK": 1.0,
+        "CALL": 1.0
+    },
+    "P0_S2_Nuts_High": {
+        "CHECK": 1.0,
+        "CALL": 1.0
+    },
+    "P1_S1_Nuts_High": {
+        "FOLD": 0.333,
+        "CALL": 0.333,
+        "RAISE": 0.333
+    }
+}
