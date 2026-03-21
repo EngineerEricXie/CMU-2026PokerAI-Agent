@@ -82,9 +82,9 @@ def exhaustive_choose_discard_optimized(hole: list, community: list, opp_discard
 # ==========================================
 # 2. RLAgent 主体 (混合神经引擎)
 # ==========================================
-class PlayerAgent(Agent):
+class RLAgent(Agent):
     def __name__(self):
-        return "PlayerAgent"
+        return "RLAgent"
 
     def __init__(self, stream: bool = True):
         super().__init__(stream)

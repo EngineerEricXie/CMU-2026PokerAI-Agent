@@ -71,6 +71,8 @@ class AllInAgent(Agent):
 
 
 class RandomAgent(Agent):
+    def __name__(self):
+        return "RandomAgent"
     def __init__(self, stream: bool = False):
         super().__init__(stream)  # This sets up the logger and API logic
         self.action_types = PokerEnv.ActionType
