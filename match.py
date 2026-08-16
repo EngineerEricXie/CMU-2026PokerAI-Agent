@@ -48,6 +48,19 @@ class AgentFailureTracker:
 
 # Create a global instance
 failure_tracker = AgentFailureTracker()
+bankrolls = [0, 0]  # Track total bankrolls across all hands
+time_used_0 = 0.0
+time_used_1 = 0.0
+
+
+def reset_match_state() -> None:
+    """Reset process-wide match counters before starting a new match."""
+    global bankrolls, time_used_0, time_used_1, failure_tracker
+
+    bankrolls = [0, 0]
+    time_used_0 = 0.0
+    time_used_1 = 0.0
+    failure_tracker = AgentFailureTracker()
 
 
 def get_street_name(street_num: int) -> str:
@@ -158,9 +171,6 @@ def call_agent_api(
         raise
 
 
-bankrolls = [0, 0]  # Track total bankrolls across all hands
-
-
 def run_api_match(
     base_url_0: str,
     base_url_1: str,
@@ -175,6 +185,7 @@ def run_api_match(
     Each iteration creates a new PokerEnv instance representing one hand.
     """
     global bankrolls
+    reset_match_state()
     csv_headers = [
         "hand_number",
         "street",
@@ -237,10 +248,6 @@ def run_api_match(
         logger.info(f"Time limit: {TIME_LIMIT_SECONDS} seconds")
 
         return get_match_result("completed", rewards=(bankrolls[0], bankrolls[1]))
-
-
-time_used_0 = 0.0
-time_used_1 = 0.0
 
 
 def play_hand(

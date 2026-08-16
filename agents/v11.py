@@ -110,8 +110,8 @@ def choose_discard(
 # ---------------------------------------------------------------------------
 class V11(Agent):
 
-    def __init__(self, stream: bool = True):
-        super().__init__(stream)
+    def __init__(self, stream: bool = True, player_id=None):
+        super().__init__(stream, player_id=player_id)
         self.action_types = ActionType
         # --- 新增：全域資源與狀態追蹤 ---
         self.start_time = time.perf_counter()
@@ -212,7 +212,7 @@ class V11(Agent):
             # 強制換牌階段 (Street 1) 必須選兩張牌保留 [cite: 36, 449]
             if valid_actions[ActionType.DISCARD.value]:
                 # return ActionType.DISCARD.value, 0, 0, 1
-                do_discard(0, 1)
+                return do_discard(0, 1)
             if valid_actions[ActionType.FOLD.value]:
                 return fold()
             return check()

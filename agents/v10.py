@@ -108,8 +108,8 @@ def choose_discard(
 # ---------------------------------------------------------------------------
 class V10(Agent):
 
-    def __init__(self, stream: bool = True):
-        super().__init__(stream)
+    def __init__(self, stream: bool = True, player_id=None):
+        super().__init__(stream, player_id=player_id)
         self.action_types = ActionType
         # --- 新增：全域資源與狀態追蹤 ---
         self.start_time = time.perf_counter()

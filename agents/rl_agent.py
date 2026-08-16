@@ -23,8 +23,8 @@ class RLAgent(Agent):
     def __name__(self):
         return "RLAgent"
 
-    def __init__(self, stream: bool = True):
-        super().__init__(stream)
+    def __init__(self, stream: bool = True, player_id=None):
+        super().__init__(stream, player_id=player_id)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy_net = PolicyNetwork(input_dim=INPUT_DIM, num_discard_classes=NUM_DISCARD_CLASSES)
         if os.path.exists(WEIGHTS_PATH):

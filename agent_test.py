@@ -2,7 +2,6 @@
 Basic Test Suite for PlayerAgent which checks that it never does an invalid action
 """
 
-from ast import Call
 import importlib.util
 import multiprocessing
 import os
@@ -98,7 +97,13 @@ def run_test_match(test_agent_class: Agent, logger):
 
         time.sleep(2)
 
-        result = run_api_match("http://127.0.0.1:8000", "http://127.0.0.1:8001", logger, num_hands=NUM_HANDS, csv_path=f"./match_{test_agent_class.__name__}.csv")
+        result = run_api_match(
+            "http://127.0.0.1:8000",
+            "http://127.0.0.1:8001",
+            logger,
+            num_hands=NUM_HANDS,
+            csv_path=f"./match_{test_agent_class.__name__}.csv",
+        )
 
         return result
 
@@ -155,18 +160,18 @@ def main():
 
             if result["status"] == "completed":
                 test_results["games_completed"] += NUM_HANDS
-                print(f"✓ Completed {NUM_HANDS} games successfully")
+                print(f"Completed {NUM_HANDS} games successfully")
             elif result["status"] == "timeout":
                 test_results["timeout_errors"] += 1
-                print(f"✗ Failed: Time limit exceeded")
+                print("Failed: Time limit exceeded")
             else:
                 test_results["runtime_errors"] += 1
-                print(f"✗ Failed: Runtime error")
+                print("Failed: Runtime error")
                 print(f"  {result.get('error', 'Unknown error')}")
 
         except Exception as e:
             test_results["runtime_errors"] += 1
-            print(f"✗ Failed: Runtime error")
+            print("Failed: Runtime error")
             print(f"  {str(e)}")
             continue
 
@@ -175,9 +180,9 @@ def main():
 
         if time_per_hand > TIME_PER_HAND:
             test_results["timeout_errors"] += 1
-            print(f"✗ Time limit exceeded: {time_per_hand:.2f}s per hand (limit: {TIME_PER_HAND}s)")
+            print(f"Time limit exceeded: {time_per_hand:.2f}s per hand (limit: {TIME_PER_HAND}s)")
         else:
-            print(f"✓ Time check passed: {time_per_hand:.2f}s per hand")
+            print(f"Time check passed: {time_per_hand:.2f}s per hand")
 
     print("\nTest Suite Summary")
     print("-" * 50)

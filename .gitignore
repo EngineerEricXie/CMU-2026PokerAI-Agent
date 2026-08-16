@@ -124,6 +124,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.venv*/
 env/
 venv/
 ENV/
@@ -169,3 +170,12 @@ cython_debug/
 # Poker engine logs
 logs/
 agent_logs/
+
+# Local model artifacts
+*.pth
+*.pt
+*.onnx
+
+# Local editor/project files
+.idea/
+.vscode/

@@ -1,52 +1,73 @@
-# PokerBotEngine2026
+# CMU Poker AI Agent
 
-## How to run the engine
+Python engine, agents, and evaluation scripts for a custom heads-up poker AI
+competition variant. The project includes a Gym-style poker environment,
+FastAPI-based agent wrappers, baseline agents, a Monte Carlo player agent, and
+match tooling for local evaluation.
 
-1. Create a virtual environment:
+## Project Layout
 
-   ```bash
-   python3.12 -m venv .venv
-   ```
-
-2. Activate the virtual environment:
-   - On Windows:
-
-     ```bash
-     .venv\Scripts\activate
-     ```
-
-   - On macOS and Linux:
-
-     ```bash
-     source .venv/bin/activate
-     ```
-
-3. Install the required packages:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Running Tests
-
-1. Basic coverage test:
-
-```bash
-pytest --cov=gym_env --cov-report=term-missing --cov-report=html --cov-branch
+```text
+.
+├── agents/                 # Baseline and experimental agents
+├── docs/                   # Competition rules and engine notes
+├── submission/             # Public PlayerAgent implementation
+├── gym_env.py              # Core poker environment
+├── match.py                # API match runner
+├── run.py                  # Config-driven local match entrypoint
+├── agent_test.py           # Submission smoke test against baseline agents
+└── engine_test.py          # Engine behavior tests
 ```
 
-### Testing Your Submission
+## Setup
 
-1. To test your agent (5 hands per bot) against ProbabilityAgent, AllInAgent, FoldAgent, CallingStationAgent, RandomAgent:
+Requires Python 3.12.
 
 ```bash
-python agent_test.py
+python -m venv .venv
+.venv\Scripts\activate
+python -m pip install -r requirements.txt
 ```
 
-2. To run a full match (1000 hands) of your agent against a specific agent:
+On macOS or Linux, activate the environment with:
+
+```bash
+source .venv/bin/activate
+```
+
+For RL training experiments, also install the optional PyTorch dependency:
+
+```bash
+python -m pip install ".[rl]"
+```
+
+## Run A Match
+
+Edit `agent_config.json` to choose the two agent classes and ports, then run:
 
 ```bash
 python run.py
 ```
 
-You can modify which bots play by modifying the agent config file. Write the file path to the corresponding agent for that bot to play.
+By default, `bot0` uses `submission.player.PlayerAgent` and `bot1` uses
+`agents.v11.V11`.
+
+## Test
+
+Run the engine and API tests:
+
+```bash
+python -m pytest
+```
+
+Run the submission smoke test against baseline agents:
+
+```bash
+python agent_test.py
+```
+
+## Notes
+
+- Match CSV output and runtime logs are ignored by Git.
+- RL training artifacts such as `*.pth` are ignored by Git.
+- This repository does not currently declare an open-source license.

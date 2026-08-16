@@ -16,8 +16,8 @@ class ProbabilityAgent(Agent):
     def __name__(self):
         return "ProbabilityAgent"
 
-    def __init__(self, stream: bool = True):
-        super().__init__(stream)
+    def __init__(self, stream: bool = True, player_id=None):
+        super().__init__(stream, player_id=player_id)
         self.evaluator = PokerEnv().evaluator
 
     def _compute_equity(

@@ -117,19 +117,26 @@ class Action:
     def __init__(
         self,
         action: int,
-        raise_ammount: int,
+        raise_amount: int,
         keep1: int,
         keep2: int
     ):
         assert isinstance(action, int)
-        assert isinstance(raise_ammount, int)
+        assert isinstance(raise_amount, int)
         self.action = action
-        self.raise_ammount = raise_ammount
+        self.raise_amount = raise_amount
         self.keep1 = keep1
         self.keep2 = keep2
 
     def __repr__(self):
-        return f"Action(action={repr(self.action)}, raise_ammount={repr(self.raise_ammount)}, card_to_discard={repr(self.card_to_discard)})"
+        return (
+            "Action("
+            f"action={self.action!r}, "
+            f"raise_amount={self.raise_amount!r}, "
+            f"keep1={self.keep1!r}, "
+            f"keep2={self.keep2!r}"
+            ")"
+        )
 
 
 class GameState:
@@ -191,7 +198,7 @@ def _test_engine(rigged_deck: list[int], updates: list[tuple[Action, tuple[dict,
     check_observation(player1_expected_obs, player1_obs)
 
     for i, (action, expected_state) in enumerate(updates):
-        obs, reward, terminated, _, _ = engine.step((action.action, action.raise_ammount, action.keep1, action.keep2))
+        obs, reward, terminated, _, _ = engine.step((action.action, action.raise_amount, action.keep1, action.keep2))
         p0_got_obs, p1_got_obs = obs
         p0_got_reward, p1_got_reward = reward
 

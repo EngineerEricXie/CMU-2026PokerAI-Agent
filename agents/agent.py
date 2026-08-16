@@ -1,9 +1,8 @@
 import logging
 import os
 import sys
-import tempfile
 from abc import ABC, abstractmethod
-from typing import Any, List, Tuple, TypedDict
+from typing import Any, List, Optional, Tuple, TypedDict
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -50,7 +49,7 @@ class ActionResponse(BaseModel):
 
 
 class Agent(ABC):
-    def __init__(self, stream: bool = False, player_id: str = None):
+    def __init__(self, stream: bool = False, player_id: Optional[str] = None):
         self.app = FastAPI()
         self.player_id = player_id
         self.logger = self._setup_logger(stream)
@@ -90,7 +89,7 @@ class Agent(ABC):
         """Return the name of the agent. Must be implemented by subclasses."""
         pass
 
-    def get_bot_action(self, observation, reward, terminated, truncated, info) -> tuple[int, int]:
+    def get_bot_action(self, observation, reward, terminated, truncated, info) -> Tuple[int, int, int, int]:
         """
         Given the current state, return the action to take.
         """
@@ -109,7 +108,7 @@ class Agent(ABC):
 
 
     @abstractmethod
-    def act(self, observation, reward, terminated, truncated, info) -> tuple[int, int]:
+    def act(self, observation, reward, terminated, truncated, info) -> Tuple[int, int, int, int]:
         """
         Given the current state, return the action to take.
 
@@ -117,7 +116,7 @@ class Agent(ABC):
             reward (int)  : 0 if terminated is false, or the profit / loss of the game
             #TODO: add the types of the arguments
         Returns:
-            action (Tuple[int, int]) : (cumulative amount to bet, index of the card to discard)
+            action: (action_type, raise_amount, keep_card_1, keep_card_2)
         """
         pass
 
@@ -167,10 +166,10 @@ class Agent(ABC):
                 raise HTTPException(status_code=500, detail=str(e))
 
     @classmethod
-    def run(cls, stream: bool = False, port: int = 8000, host: str = "0.0.0.0", player_id: str = None):
+    def run(cls, stream: bool = False, port: int = 8000, host: str = "0.0.0.0", player_id: Optional[str] = None):
         """Run an API-based bot on a specified port."""
         if player_id is not None:
             os.environ["PLAYER_ID"] = player_id
-        bot = cls(stream)
+        bot = cls(stream, player_id=player_id)
         bot.logger.info(f"Starting agent server on {host}:{port}")
         uvicorn.run(bot.app, host=host, port=port, log_level="info", access_log=False)
